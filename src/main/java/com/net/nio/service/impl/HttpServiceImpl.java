@@ -60,6 +60,7 @@ public class HttpServiceImpl implements HttpService {
                         httpResponseVO.setOriginHeader(new byte[1024]);
                         httpResponseVO.setBodyIndex(0);
                         httpResponseVO.setBody(new byte[1024]);
+                        httpResponseVO.setChunked("");
                         selectionKey.attach(httpResponseVO);
                         selectionKey.interestOps(SelectionKey.OP_READ);
                     } else {
@@ -68,32 +69,44 @@ public class HttpServiceImpl implements HttpService {
                     }
                 } else if (selectionKey.isReadable()) {
                     selectionKey.interestOps(0);
+                    Integer contentLength = null;
+                    String transferEncoding = null;
                     SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
                     ByteBuffer byteBuffer = ByteBuffer.allocate(1024 * 1024);
                     HttpResponseVO httpResponseVO = (HttpResponseVO) selectionKey.attachment();
                     byte[] body = httpResponseVO.getBody();
                     Integer bodyIndex = httpResponseVO.getBodyIndex();
-                    byte[] headers = httpResponseVO.getOriginHeader();
+                    byte[] originHeader = httpResponseVO.getOriginHeader();
                     Integer headerIndex = httpResponseVO.getHeaderIndex();
                     while (socketChannel.read(byteBuffer) > 0) {
                         byteBuffer.flip();
                         for (int i = 0; i < byteBuffer.limit(); i++) {
                             if (headerIndex > -1) {
-                                if (headers.length == headerIndex) {
-                                    byte[] temp = new byte[headers.length + 1024];
-                                    for (int j = 0; j < headers.length; j++) {
-                                        temp[j] = headers[j];
+                                if (originHeader.length == headerIndex) {
+                                    byte[] temp = new byte[originHeader.length + 1024];
+                                    for (int j = 0; j < originHeader.length; j++) {
+                                        temp[j] = originHeader[j];
                                     }
-                                    headers = temp;
-                                    httpResponseVO.setOriginHeader(headers);
+                                    originHeader = temp;
+                                    httpResponseVO.setOriginHeader(originHeader);
                                 }
-                                headers[headerIndex++] = byteBuffer.get(i);
-                                if (headers[headerIndex - 1] == '\n' && headers[headerIndex - 2] == '\r' && headers[headerIndex - 3] == '\n' && headers[headerIndex - 4] == '\r') {
+                                originHeader[headerIndex++] = byteBuffer.get(i);
+                                if (originHeader[headerIndex - 1] == '\n' && originHeader[headerIndex - 2] == '\r' && originHeader[headerIndex - 3] == '\n' && originHeader[headerIndex - 4] == '\r') {
                                     headerIndex = -1;
-                                    System.out.println(new String(headers));
+                                    String headerStr = new String(originHeader);
+                                    String[] headerList = headerStr.split("\r\n");
+                                    String[] responseLine = headerList[0].split(" ");
+                                    httpResponseVO.setProtocol(responseLine[0]);
+                                    httpResponseVO.setStatusMsg(responseLine[2]);
+                                    httpResponseVO.setStatusCode(Integer.parseInt(responseLine[1]));
+                                    httpResponseVO.setHeaders(Arrays.stream(headerList).skip(1).filter(h -> h.contains(":")).collect(Collectors.groupingBy(h -> h.split(":")[0], LinkedHashMap::new, Collectors.mapping(h -> h.split(":")[1].trim(), Collectors.toList()))));
                                 }
                                 httpResponseVO.setHeaderIndex(headerIndex);
                             } else {
+                                LinkedHashMap<String, List<String>> headers = httpResponseVO.getHeaders();
+                                transferEncoding = Optional.ofNullable(transferEncoding).orElseGet(() -> Optional.ofNullable(headers.get("Transfer-Encoding")).filter(Objects::nonNull).map(c -> c.get(0)).orElse(null));
+                                contentLength = Optional.ofNullable(contentLength).orElseGet(() -> Optional.ofNullable(headers.get("Content-Length")).filter(Objects::nonNull).map(c -> Integer.parseInt(c.get(0))).orElse(null));
+
                                 if (body.length == bodyIndex) {
                                     byte[] temp = new byte[body.length + 1024];
                                     for (int j = 0; j < body.length; j++) {
@@ -102,25 +115,40 @@ public class HttpServiceImpl implements HttpService {
                                     body = temp;
                                     httpResponseVO.setBody(body);
                                 }
-                                body[bodyIndex++] = byteBuffer.get(i);
-                                httpResponseVO.setBodyIndex(bodyIndex);
-                                if (bodyIndex == 2497253) {
-                                    break;
+
+                                byte b = byteBuffer.get(i);
+                                if (contentLength != null) {
+                                    body[bodyIndex++] = b;
+                                    httpResponseVO.setBodyIndex(bodyIndex);
+                                    if (bodyIndex.equals(contentLength)) {
+                                        //关闭socketChannel，当再次执行selector.select()时，会将此socketChannel从selector中移除
+                                        socketChannel.close();
+                                        System.out.println(new String(body));
+                                        return;
+                                    }
+                                } else if ("chunked".equals(transferEncoding)) {
+                                    String chunked = httpResponseVO.getChunked();
+                                    if (chunked.endsWith("\r\n")) {
+                                        if (chunked.equals("\r\n")) {
+                                            socketChannel.close();
+                                            System.out.println(new String(body));
+                                            return;
+                                        }
+                                        Integer chunkedNum = Integer.parseInt(chunked.replace("\r\n", ""), 16);
+                                        body[bodyIndex++] = b;
+                                        if (bodyIndex - httpResponseVO.getChunkedInitIndex() == chunkedNum) {
+                                            httpResponseVO.setChunked("");
+                                        }
+                                    } else {
+                                        httpResponseVO.setChunkedInitIndex(bodyIndex);
+                                        httpResponseVO.setChunked(chunked + new String(new byte[]{b}));
+                                    }
                                 }
                             }
                         }
                         byteBuffer.clear();
                     }
-                    if (bodyIndex == 2497253) {
-                        //关闭socketChannel，当再次执行selector.select()时，会将此socketChannel从selector中移除
-                        socketChannel.close();
-                        FileOutputStream file = new FileOutputStream("aaa.gif");
-                        file.write(body);
-                        file.close();
-                        //System.out.println(new String(body));
-                    } else {
-                        selectionKey.interestOps(SelectionKey.OP_READ);
-                    }
+                    selectionKey.interestOps(SelectionKey.OP_READ);
                 }
             }
         }
@@ -153,7 +181,7 @@ public class HttpServiceImpl implements HttpService {
 
     public static void main(String[] args) throws IOException {
         HttpServiceImpl httpService = new HttpServiceImpl();
-        httpService.doGet("i1.fuimg.com/655949/6d64438f2838ae8b.gif");
+        httpService.doGet("www.tietuku.com/album/1735537-2");
         httpService.nioMonitor();
     }
 

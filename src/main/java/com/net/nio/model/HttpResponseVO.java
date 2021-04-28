@@ -3,6 +3,7 @@ package com.net.nio.model;
 import lombok.Data;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -14,9 +15,9 @@ import java.util.Map;
 public class HttpResponseVO {
 
     /**
-     * 响应行
+     * 协议
      */
-    private String responseLine;
+    private String protocol;
 
     /**
      * 状态码
@@ -26,7 +27,7 @@ public class HttpResponseVO {
     /**
      * 状态描述
      */
-    private Integer statusMsg;
+    private String statusMsg;
 
     /**
      * 原始响应头下标
@@ -44,13 +45,23 @@ public class HttpResponseVO {
     private Integer bodyIndex;
 
     /**
-     * 原始响应头
+     * 响应头
+     */
+    private LinkedHashMap<String, List<String>> headers;
+
+    /**
+     * 响应体
      */
     private byte[] body;
 
     /**
-     * 响应头
+     * 分段长度
      */
-    private LinkedHashMap headers;
+    private String chunked;
 
+
+    /**
+     * 分段在body的原始位置
+     */
+    private Integer chunkedInitIndex;
 }
