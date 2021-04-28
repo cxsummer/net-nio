@@ -1,8 +1,10 @@
 package com.net.nio.service.impl;
 
 import com.net.nio.model.HttpRequestVO;
+import com.net.nio.model.HttpResponseVO;
 import com.net.nio.service.HttpService;
 
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -50,8 +52,15 @@ public class HttpServiceImpl implements HttpService {
                         String requestStr = headers.entrySet().stream().map(e -> e.getKey() + ":" + e.getValue()).collect(Collectors.joining("\r\n", requestLine, "\r\n\r\n"));
                         byteBuffer = ByteBuffer.wrap(requestStr.getBytes("UTF-8"));
                     }
-                    socketChannel.write(byteBuffer);
+                    while (socketChannel.write(byteBuffer) > 0) {
+                    }
                     if (!byteBuffer.hasRemaining()) {
+                        HttpResponseVO httpResponseVO = new HttpResponseVO();
+                        httpResponseVO.setHeaderIndex(0);
+                        httpResponseVO.setOriginHeader(new byte[1024]);
+                        httpResponseVO.setBodyIndex(0);
+                        httpResponseVO.setBody(new byte[1024]);
+                        selectionKey.attach(httpResponseVO);
                         selectionKey.interestOps(SelectionKey.OP_READ);
                     } else {
                         selectionKey.attach(byteBuffer);
@@ -61,11 +70,57 @@ public class HttpServiceImpl implements HttpService {
                     selectionKey.interestOps(0);
                     SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
                     ByteBuffer byteBuffer = ByteBuffer.allocate(1024 * 1024);
-                    int successBytes = socketChannel.read(byteBuffer);
-                    byteBuffer.flip();
-                    byte[] b = new byte[byteBuffer.limit()];
-                    byteBuffer.get(b);
-                    System.out.print(new String(b, "utf-8"));
+                    HttpResponseVO httpResponseVO = (HttpResponseVO) selectionKey.attachment();
+                    byte[] body = httpResponseVO.getBody();
+                    Integer bodyIndex = httpResponseVO.getBodyIndex();
+                    byte[] headers = httpResponseVO.getOriginHeader();
+                    Integer headerIndex = httpResponseVO.getHeaderIndex();
+                    while (socketChannel.read(byteBuffer) > 0) {
+                        byteBuffer.flip();
+                        for (int i = 0; i < byteBuffer.limit(); i++) {
+                            if (headerIndex > -1) {
+                                if (headers.length == headerIndex) {
+                                    byte[] temp = new byte[headers.length + 1024];
+                                    for (int j = 0; j < headers.length; j++) {
+                                        temp[j] = headers[j];
+                                    }
+                                    headers = temp;
+                                    httpResponseVO.setOriginHeader(headers);
+                                }
+                                headers[headerIndex++] = byteBuffer.get(i);
+                                if (headers[headerIndex - 1] == '\n' && headers[headerIndex - 2] == '\r' && headers[headerIndex - 3] == '\n' && headers[headerIndex - 4] == '\r') {
+                                    headerIndex = -1;
+                                    System.out.println(new String(headers));
+                                }
+                                httpResponseVO.setHeaderIndex(headerIndex);
+                            } else {
+                                if (body.length == bodyIndex) {
+                                    byte[] temp = new byte[body.length + 1024];
+                                    for (int j = 0; j < body.length; j++) {
+                                        temp[j] = body[j];
+                                    }
+                                    body = temp;
+                                    httpResponseVO.setBody(body);
+                                }
+                                body[bodyIndex++] = byteBuffer.get(i);
+                                httpResponseVO.setBodyIndex(bodyIndex);
+                                if (bodyIndex == 2497253) {
+                                    break;
+                                }
+                            }
+                        }
+                        byteBuffer.clear();
+                    }
+                    if (bodyIndex == 2497253) {
+                        //关闭socketChannel，当再次执行selector.select()时，会将此socketChannel从selector中移除
+                        socketChannel.close();
+                        FileOutputStream file = new FileOutputStream("aaa.gif");
+                        file.write(body);
+                        file.close();
+                        //System.out.println(new String(body));
+                    } else {
+                        selectionKey.interestOps(SelectionKey.OP_READ);
+                    }
                 }
             }
         }
@@ -98,7 +153,7 @@ public class HttpServiceImpl implements HttpService {
 
     public static void main(String[] args) throws IOException {
         HttpServiceImpl httpService = new HttpServiceImpl();
-        httpService.doGet("www.tietuku.com/album/1735537");
+        httpService.doGet("i1.fuimg.com/655949/6d64438f2838ae8b.gif");
         httpService.nioMonitor();
     }
 

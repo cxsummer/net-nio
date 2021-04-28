@@ -2,6 +2,7 @@ package com.net.nio.model;
 
 import lombok.Data;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -35,5 +36,5 @@ public class HttpRequestVO {
     /**
      * 请求头
      */
-    private Map headers;
+    private LinkedHashMap headers;
 }
