@@ -11,6 +11,8 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -32,6 +34,7 @@ public class HttpServiceImpl implements HttpService {
     }
 
     public void nioMonitor() throws IOException {
+        LocalDateTime start=LocalDateTime.now();
         while (selector.select() > 0) {
             Iterator<SelectionKey> iterator = selector.selectedKeys().iterator();
             while (iterator.hasNext()) {
@@ -129,19 +132,22 @@ public class HttpServiceImpl implements HttpService {
                                 } else if ("chunked".equals(transferEncoding)) {
                                     String chunked = httpResponseVO.getChunked();
                                     if (chunked.endsWith("\r\n")) {
-                                        if (chunked.equals("\r\n")) {
+                                        Integer chunkedNum = Integer.parseInt(chunked.replace("\r\n", ""), 16);
+                                        if (chunkedNum == 0) {
                                             socketChannel.close();
                                             System.out.println(new String(body));
+                                            System.out.println("用时："+ Duration.between(start, LocalDateTime.now()).toMillis() );
                                             return;
                                         }
-                                        Integer chunkedNum = Integer.parseInt(chunked.replace("\r\n", ""), 16);
                                         body[bodyIndex++] = b;
                                         if (bodyIndex - httpResponseVO.getChunkedInitIndex() == chunkedNum) {
                                             httpResponseVO.setChunked("");
                                         }
+                                    } else if (chunked.equals("") && (b == '\r' || b == '\n')) {
+                                        continue;
                                     } else {
                                         httpResponseVO.setChunkedInitIndex(bodyIndex);
-                                        httpResponseVO.setChunked(chunked + new String(new byte[]{b}));
+                                        httpResponseVO.setChunked(chunked + new String(new byte[]{b}, "UTF-8"));
                                     }
                                 }
                             }
