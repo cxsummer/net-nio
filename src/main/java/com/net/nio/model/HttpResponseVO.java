@@ -74,4 +74,9 @@ public class HttpResponseVO {
         this.originHeader = originHeader;
         return originHeader;
     }
+
+    public Integer getIncrementBodyIndex() {
+        this.bodyIndex++;
+        return bodyIndex - 1;
+    }
 }
