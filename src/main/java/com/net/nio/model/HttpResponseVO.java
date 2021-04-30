@@ -5,6 +5,7 @@ import lombok.Data;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 /**
  * @author caojiancheng
@@ -64,6 +65,11 @@ public class HttpResponseVO {
      * 分段在body的原始位置
      */
     private Integer chunkedInitIndex;
+
+    /**
+     * 回调方法
+     */
+    Consumer<HttpResponseVO> consumer;
 
     public byte[] setGetBody(byte[] body) {
         this.body = body;

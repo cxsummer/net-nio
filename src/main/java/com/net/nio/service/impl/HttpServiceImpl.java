@@ -3,19 +3,15 @@ package com.net.nio.service.impl;
 import com.net.nio.model.HttpRequestVO;
 import com.net.nio.model.HttpResponseVO;
 import com.net.nio.service.HttpService;
-import com.net.nio.utils.DataUtil;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
-import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -28,7 +24,6 @@ import static com.net.nio.utils.DataUtil.byteExpansion;
  */
 public class HttpServiceImpl implements HttpService {
 
-    AtomicInteger num = new AtomicInteger(0);
     private Selector selector;
 
     public HttpServiceImpl() {
@@ -64,19 +59,9 @@ public class HttpServiceImpl implements HttpService {
      * @return
      */
     private void writeHandler(SelectionKey selectionKey) throws IOException {
-        ByteBuffer byteBuffer;
         SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
-        if (selectionKey.attachment() instanceof ByteBuffer) {
-            byteBuffer = (ByteBuffer) selectionKey.attachment();
-        } else {
-            HttpRequestVO httpRequestVO = (HttpRequestVO) selectionKey.attachment();
-            Map<String, Object> headers = Optional.ofNullable(httpRequestVO.getHeaders()).orElseGet(LinkedHashMap::new);
-            headers.put("HOST", headers.getOrDefault("HOST", httpRequestVO.getAddress()));
-
-            String requestLine = httpRequestVO.getMethod() + " " + httpRequestVO.getQueryString() + " HTTP/1.1 \r\n";
-            String requestStr = headers.entrySet().stream().map(e -> e.getKey() + ":" + e.getValue()).collect(Collectors.joining("\r\n", requestLine, "\r\n\r\n"));
-            byteBuffer = ByteBuffer.wrap(requestStr.getBytes("UTF-8"));
-        }
+        HttpRequestVO httpRequestVO = (HttpRequestVO) selectionKey.attachment();
+        ByteBuffer byteBuffer = requestByteBuffer(httpRequestVO);
         while (socketChannel.write(byteBuffer) > 0) {
         }
         if (!byteBuffer.hasRemaining()) {
@@ -86,12 +71,35 @@ public class HttpServiceImpl implements HttpService {
             httpResponseVO.setHeaderIndex(0);
             httpResponseVO.setBody(new byte[1024]);
             httpResponseVO.setOriginHeader(new byte[1024]);
+            httpResponseVO.setConsumer(httpRequestVO.getConsumer());
             selectionKey.attach(httpResponseVO);
             selectionKey.interestOps(SelectionKey.OP_READ);
         } else {
-            selectionKey.attach(byteBuffer);
             selectionKey.interestOps(SelectionKey.OP_WRITE);
         }
+    }
+
+    /**
+     * 将请求转为http请求数组
+     *
+     * @param httpRequestVO
+     * @return
+     */
+    private ByteBuffer requestByteBuffer(HttpRequestVO httpRequestVO) {
+        return Optional.ofNullable(httpRequestVO.getByteBuffer()).orElseGet(() -> {
+            try {
+                Map<String, Object> headers = Optional.ofNullable(httpRequestVO.getHeaders()).orElseGet(LinkedHashMap::new);
+                headers.put("HOST", headers.getOrDefault("HOST", httpRequestVO.getAddress()));
+
+                String requestLine = httpRequestVO.getMethod() + " " + httpRequestVO.getQueryString() + " HTTP/1.1 \r\n";
+                String requestStr = headers.entrySet().stream().map(e -> e.getKey() + ":" + e.getValue()).collect(Collectors.joining("\r\n", requestLine, "\r\n\r\n"));
+                ByteBuffer item = ByteBuffer.wrap(requestStr.getBytes("UTF-8"));
+                httpRequestVO.setByteBuffer(item);
+                return item;
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
     }
 
     /**
@@ -118,18 +126,18 @@ public class HttpServiceImpl implements HttpService {
                     headerHandler(b, httpResponseVO);
                 } else {
                     LinkedHashMap<String, List<String>> headers = httpResponseVO.getHeaders();
-                    transferEncoding = Optional.ofNullable(transferEncoding).orElseGet(() -> Optional.ofNullable(headers.get("Transfer-Encoding")).filter(Objects::nonNull).map(c -> c.get(0)).orElse(null));
-                    contentLength = Optional.ofNullable(contentLength).orElseGet(() -> Optional.ofNullable(headers.get("Content-Length")).filter(Objects::nonNull).map(c -> Integer.parseInt(c.get(0))).orElse(null));
+                    transferEncoding = Optional.ofNullable(transferEncoding).orElseGet(() -> Optional.ofNullable(headers.get("Transfer-Encoding")).filter(Objects::nonNull).map(c -> c.get(0)).orElse(""));
+                    contentLength = Optional.ofNullable(contentLength).orElseGet(() -> Optional.ofNullable(headers.get("Content-Length")).filter(Objects::nonNull).map(c -> Integer.parseInt(c.get(0))).orElse(-1));
 
                     if (body.length == httpResponseVO.getBodyIndex()) {
                         body = httpResponseVO.setGetBody(byteExpansion(body));
                     }
 
-                    if (contentLength != null) {
+                    if (contentLength != -1) {
                         body[httpResponseVO.getIncrementBodyIndex()] = b;
                         if (httpResponseVO.getBodyIndex().equals(contentLength)) {
                             socketChannel.close();
-                            System.out.println(new String(body));
+                            httpResponseVO.getConsumer().accept(httpResponseVO);
                             return;
                         }
                     } else if ("chunked".equals(transferEncoding)) {
@@ -138,8 +146,7 @@ public class HttpServiceImpl implements HttpService {
                             Integer chunkedNum = Integer.parseInt(chunked.replace("\r\n", ""), 16);
                             if (chunkedNum == 0) {
                                 socketChannel.close();
-                                //System.out.println(new String(body));
-                                System.out.println("第" + num.incrementAndGet() + "个");
+                                httpResponseVO.getConsumer().accept(httpResponseVO);
                                 return;
                             }
                             body[httpResponseVO.getIncrementBodyIndex()] = b;
@@ -186,7 +193,7 @@ public class HttpServiceImpl implements HttpService {
         httpResponseVO.setHeaderIndex(headerIndex);
     }
 
-    public void doGet(String uri, LinkedHashMap... headers) {
+    public void doGet(String uri, Consumer<HttpResponseVO> consumer, LinkedHashMap... headers) {
         try {
             int port = 80;
             int pathIndex = uri.indexOf("/");
@@ -200,6 +207,7 @@ public class HttpServiceImpl implements HttpService {
             httpRequestVO.setPort(port);
             httpRequestVO.setMethod("GET");
             httpRequestVO.setAddress(address);
+            httpRequestVO.setConsumer(consumer);
             httpRequestVO.setQueryString(uri.substring(pathIndex));
             Optional.ofNullable(headers).filter(Objects::nonNull).filter(h -> h.length > 0).map(h -> h[0]).ifPresent(httpRequestVO::setHeaders);
 
@@ -213,8 +221,10 @@ public class HttpServiceImpl implements HttpService {
 
     public static void main(String[] args) throws IOException {
         HttpServiceImpl httpService = new HttpServiceImpl();
-        IntStream.range(0, 50).forEach(i -> {
-            httpService.doGet("www.tietuku.com/album/1735537-2");
+        IntStream.range(0, 2).forEach(i -> {
+            httpService.doGet("www.tietuku.com/album/1735537-2", httpResponseVO->{
+                System.out.println(new String(httpResponseVO.getBody()));
+            });
         });
         try {
             httpService.nioMonitor();

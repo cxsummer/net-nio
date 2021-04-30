@@ -2,8 +2,10 @@ package com.net.nio.model;
 
 import lombok.Data;
 
+import java.nio.ByteBuffer;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.Consumer;
 
 /**
  * @author caojiancheng
@@ -37,4 +39,14 @@ public class HttpRequestVO {
      * 请求头
      */
     private LinkedHashMap headers;
+
+    /**
+     * 回调方法
+     */
+    Consumer<HttpResponseVO> consumer;
+
+    /**
+     * 写入的ByteBuffer
+     */
+    private ByteBuffer byteBuffer;
 }
