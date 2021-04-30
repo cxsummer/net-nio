@@ -64,4 +64,14 @@ public class HttpResponseVO {
      * 分段在body的原始位置
      */
     private Integer chunkedInitIndex;
+
+    public byte[] setGetBody(byte[] body) {
+        this.body = body;
+        return body;
+    }
+
+    public byte[] setGetOriginHeader(byte[] originHeader) {
+        this.originHeader = originHeader;
+        return originHeader;
+    }
 }

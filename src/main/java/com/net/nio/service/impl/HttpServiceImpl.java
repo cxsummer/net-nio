@@ -3,8 +3,8 @@ package com.net.nio.service.impl;
 import com.net.nio.model.HttpRequestVO;
 import com.net.nio.model.HttpResponseVO;
 import com.net.nio.service.HttpService;
+import com.net.nio.utils.DataUtil;
 
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -15,6 +15,9 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
+import static com.net.nio.utils.DataUtil.byteExpansion;
 
 /**
  * @author caojiancheng
@@ -34,7 +37,7 @@ public class HttpServiceImpl implements HttpService {
     }
 
     public void nioMonitor() throws IOException {
-        LocalDateTime start=LocalDateTime.now();
+        LocalDateTime start = LocalDateTime.now();
         while (selector.select() > 0) {
             Iterator<SelectionKey> iterator = selector.selectedKeys().iterator();
             while (iterator.hasNext()) {
@@ -86,14 +89,10 @@ public class HttpServiceImpl implements HttpService {
                         for (int i = 0; i < byteBuffer.limit(); i++) {
                             if (headerIndex > -1) {
                                 if (originHeader.length == headerIndex) {
-                                    byte[] temp = new byte[originHeader.length + 1024];
-                                    for (int j = 0; j < originHeader.length; j++) {
-                                        temp[j] = originHeader[j];
-                                    }
-                                    originHeader = temp;
-                                    httpResponseVO.setOriginHeader(originHeader);
+                                    originHeader = httpResponseVO.setGetOriginHeader(byteExpansion(originHeader));
                                 }
                                 originHeader[headerIndex++] = byteBuffer.get(i);
+                                httpResponseVO.setHeaderIndex(headerIndex);
                                 if (originHeader[headerIndex - 1] == '\n' && originHeader[headerIndex - 2] == '\r' && originHeader[headerIndex - 3] == '\n' && originHeader[headerIndex - 4] == '\r') {
                                     headerIndex = -1;
                                     String headerStr = new String(originHeader);
@@ -104,19 +103,13 @@ public class HttpServiceImpl implements HttpService {
                                     httpResponseVO.setStatusCode(Integer.parseInt(responseLine[1]));
                                     httpResponseVO.setHeaders(Arrays.stream(headerList).skip(1).filter(h -> h.contains(":")).collect(Collectors.groupingBy(h -> h.split(":")[0], LinkedHashMap::new, Collectors.mapping(h -> h.split(":")[1].trim(), Collectors.toList()))));
                                 }
-                                httpResponseVO.setHeaderIndex(headerIndex);
                             } else {
                                 LinkedHashMap<String, List<String>> headers = httpResponseVO.getHeaders();
                                 transferEncoding = Optional.ofNullable(transferEncoding).orElseGet(() -> Optional.ofNullable(headers.get("Transfer-Encoding")).filter(Objects::nonNull).map(c -> c.get(0)).orElse(null));
                                 contentLength = Optional.ofNullable(contentLength).orElseGet(() -> Optional.ofNullable(headers.get("Content-Length")).filter(Objects::nonNull).map(c -> Integer.parseInt(c.get(0))).orElse(null));
 
                                 if (body.length == bodyIndex) {
-                                    byte[] temp = new byte[body.length + 1024];
-                                    for (int j = 0; j < body.length; j++) {
-                                        temp[j] = body[j];
-                                    }
-                                    body = temp;
-                                    httpResponseVO.setBody(body);
+                                    body = httpResponseVO.setGetBody(byteExpansion(body));
                                 }
 
                                 byte b = byteBuffer.get(i);
@@ -135,11 +128,12 @@ public class HttpServiceImpl implements HttpService {
                                         Integer chunkedNum = Integer.parseInt(chunked.replace("\r\n", ""), 16);
                                         if (chunkedNum == 0) {
                                             socketChannel.close();
-                                            System.out.println(new String(body));
-                                            System.out.println("用时："+ Duration.between(start, LocalDateTime.now()).toMillis() );
+                                            //System.out.println(new String(body));
+                                            System.out.println("用时：" + Duration.between(start, LocalDateTime.now()).toMillis());
                                             return;
                                         }
                                         body[bodyIndex++] = b;
+                                        httpResponseVO.setBodyIndex(bodyIndex);
                                         if (bodyIndex - httpResponseVO.getChunkedInitIndex() == chunkedNum) {
                                             httpResponseVO.setChunked("");
                                         }
@@ -147,7 +141,7 @@ public class HttpServiceImpl implements HttpService {
                                         continue;
                                     } else {
                                         httpResponseVO.setChunkedInitIndex(bodyIndex);
-                                        httpResponseVO.setChunked(chunked + new String(new byte[]{b}, "UTF-8"));
+                                        httpResponseVO.setChunked(chunked + new String(new byte[]{b}));
                                     }
                                 }
                             }
@@ -186,9 +180,17 @@ public class HttpServiceImpl implements HttpService {
     }
 
     public static void main(String[] args) throws IOException {
-        HttpServiceImpl httpService = new HttpServiceImpl();
-        httpService.doGet("www.tietuku.com/album/1735537-2");
-        httpService.nioMonitor();
+        IntStream.range(0, 50).forEach(i -> {
+            System.out.println("第" + i + "个");
+            HttpServiceImpl httpService = new HttpServiceImpl();
+            httpService.doGet("www.tietuku.com/album/1735537-2");
+            try {
+                httpService.nioMonitor();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
+
     }
 
 }
