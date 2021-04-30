@@ -87,12 +87,12 @@ public class HttpServiceImpl implements HttpService {
                     while (socketChannel.read(byteBuffer) > 0) {
                         byteBuffer.flip();
                         for (int i = 0; i < byteBuffer.limit(); i++) {
+                            byte b = byteBuffer.get(i);
                             if (headerIndex > -1) {
                                 if (originHeader.length == headerIndex) {
                                     originHeader = httpResponseVO.setGetOriginHeader(byteExpansion(originHeader));
                                 }
-                                originHeader[headerIndex++] = byteBuffer.get(i);
-                                httpResponseVO.setHeaderIndex(headerIndex);
+                                originHeader[headerIndex++] = b;
                                 if (originHeader[headerIndex - 1] == '\n' && originHeader[headerIndex - 2] == '\r' && originHeader[headerIndex - 3] == '\n' && originHeader[headerIndex - 4] == '\r') {
                                     headerIndex = -1;
                                     String headerStr = new String(originHeader);
@@ -103,6 +103,7 @@ public class HttpServiceImpl implements HttpService {
                                     httpResponseVO.setStatusCode(Integer.parseInt(responseLine[1]));
                                     httpResponseVO.setHeaders(Arrays.stream(headerList).skip(1).filter(h -> h.contains(":")).collect(Collectors.groupingBy(h -> h.split(":")[0], LinkedHashMap::new, Collectors.mapping(h -> h.split(":")[1].trim(), Collectors.toList()))));
                                 }
+                                httpResponseVO.setHeaderIndex(headerIndex);
                             } else {
                                 LinkedHashMap<String, List<String>> headers = httpResponseVO.getHeaders();
                                 transferEncoding = Optional.ofNullable(transferEncoding).orElseGet(() -> Optional.ofNullable(headers.get("Transfer-Encoding")).filter(Objects::nonNull).map(c -> c.get(0)).orElse(null));
@@ -112,7 +113,6 @@ public class HttpServiceImpl implements HttpService {
                                     body = httpResponseVO.setGetBody(byteExpansion(body));
                                 }
 
-                                byte b = byteBuffer.get(i);
                                 if (contentLength != null) {
                                     body[bodyIndex++] = b;
                                     httpResponseVO.setBodyIndex(bodyIndex);
