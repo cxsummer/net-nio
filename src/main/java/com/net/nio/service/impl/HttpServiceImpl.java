@@ -3,6 +3,7 @@ package com.net.nio.service.impl;
 import com.net.nio.model.HttpRequestVO;
 import com.net.nio.model.HttpResponseVO;
 import com.net.nio.service.HttpService;
+import com.net.nio.service.NioAbstract;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -22,43 +23,10 @@ import static com.net.nio.utils.DataUtil.byteExpansion;
  * @date 2021/4/20
  * @description
  */
-public class HttpServiceImpl implements HttpService {
+public class HttpServiceImpl extends NioAbstract implements HttpService {
 
-    private Selector selector;
-
-    public HttpServiceImpl() {
-        try {
-            selector = Selector.open();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public void nioMonitor() throws IOException {
-        while (selector.select() > 0) {
-            Iterator<SelectionKey> iterator = selector.selectedKeys().iterator();
-            while (iterator.hasNext()) {
-                SelectionKey selectionKey = iterator.next();
-                iterator.remove();
-                if (selectionKey.isWritable()) {
-                    selectionKey.interestOps(0);
-                    writeHandler(selectionKey);
-                } else if (selectionKey.isReadable()) {
-                    selectionKey.interestOps(0);
-                    readHandler(selectionKey);
-                }
-            }
-        }
-    }
-
-
-    /**
-     * 写操作
-     *
-     * @param selectionKey
-     * @return
-     */
-    private void writeHandler(SelectionKey selectionKey) throws IOException {
+    @Override
+    protected void writeHandler(SelectionKey selectionKey) throws IOException {
         SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
         HttpRequestVO httpRequestVO = (HttpRequestVO) selectionKey.attachment();
         ByteBuffer byteBuffer = requestByteBuffer(httpRequestVO);
@@ -80,38 +48,12 @@ public class HttpServiceImpl implements HttpService {
     }
 
     /**
-     * 将请求转为http请求数组
-     *
-     * @param httpRequestVO
-     * @return
-     */
-    private ByteBuffer requestByteBuffer(HttpRequestVO httpRequestVO) {
-        return Optional.ofNullable(httpRequestVO.getByteBuffer()).orElseGet(() -> {
-            try {
-                Map<String, Object> headers = Optional.ofNullable(httpRequestVO.getHeaders()).orElseGet(LinkedHashMap::new);
-                headers.put("HOST", headers.getOrDefault("HOST", httpRequestVO.getAddress()));
-
-                String requestLine = httpRequestVO.getMethod() + " " + httpRequestVO.getQueryString() + " HTTP/1.1 \r\n";
-                String requestStr = headers.entrySet().stream().map(e -> e.getKey() + ":" + e.getValue()).collect(Collectors.joining("\r\n", requestLine, "\r\n\r\n"));
-                ByteBuffer item = ByteBuffer.wrap(requestStr.getBytes("UTF-8"));
-                httpRequestVO.setByteBuffer(item);
-                return item;
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        });
-    }
-
-    /**
-     * 读操作
      * 如果Content-Length存在，那么报文体的长度就是从head（第一个\r\n\r\n）后的字节数
      * 如果Transfer-Encoding等于chunked，那么报文体是分段返回的，从head（第一个\r\n\r\n）后开始，每一段的开始是  当前段长度（16进制）\r\n 结束是 \r\n 中间的字节就是段内容，其字节数等于当前段长度
      * 关闭socketChannel，当再次执行selector.select()时，会将此socketChannel从selector中移除，所以读取完毕后需要执行socketChannel.close()
-     *
-     * @param selectionKey
-     * @return
      */
-    private void readHandler(SelectionKey selectionKey) throws IOException {
+    @Override
+    protected void readHandler(SelectionKey selectionKey) throws IOException {
         Integer contentLength = null;
         String transferEncoding = null;
         SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
@@ -167,32 +109,7 @@ public class HttpServiceImpl implements HttpService {
         selectionKey.interestOps(SelectionKey.OP_READ);
     }
 
-    /**
-     * 解析出响应头
-     *
-     * @param b
-     * @param httpResponseVO
-     */
-    private void headerHandler(byte b, HttpResponseVO httpResponseVO) {
-        Integer headerIndex = httpResponseVO.getHeaderIndex();
-        byte[] originHeader = httpResponseVO.getOriginHeader();
-        if (originHeader.length == headerIndex) {
-            originHeader = httpResponseVO.setGetOriginHeader(byteExpansion(originHeader));
-        }
-        originHeader[headerIndex++] = b;
-        if (originHeader[headerIndex - 1] == '\n' && originHeader[headerIndex - 2] == '\r' && originHeader[headerIndex - 3] == '\n' && originHeader[headerIndex - 4] == '\r') {
-            headerIndex = -1;
-            String headerStr = new String(originHeader);
-            String[] headerList = headerStr.split("\r\n");
-            String[] responseLine = headerList[0].split(" ");
-            httpResponseVO.setProtocol(responseLine[0]);
-            httpResponseVO.setStatusMsg(responseLine[2]);
-            httpResponseVO.setStatusCode(Integer.parseInt(responseLine[1]));
-            httpResponseVO.setHeaders(Arrays.stream(headerList).skip(1).filter(h -> h.contains(":")).collect(Collectors.groupingBy(h -> h.split(":")[0], LinkedHashMap::new, Collectors.mapping(h -> h.split(":")[1].trim(), Collectors.toList()))));
-        }
-        httpResponseVO.setHeaderIndex(headerIndex);
-    }
-
+    @Override
     public void doGet(String uri, Consumer<HttpResponseVO> consumer, LinkedHashMap... headers) {
         try {
             int port = 80;
@@ -219,18 +136,65 @@ public class HttpServiceImpl implements HttpService {
         }
     }
 
-    public static void main(String[] args) throws IOException {
+    /**
+     * 将请求转为http请求数组
+     *
+     * @param httpRequestVO
+     * @return
+     */
+    private ByteBuffer requestByteBuffer(HttpRequestVO httpRequestVO) {
+        return Optional.ofNullable(httpRequestVO.getByteBuffer()).orElseGet(() -> {
+            try {
+                Map<String, Object> headers = Optional.ofNullable(httpRequestVO.getHeaders()).orElseGet(LinkedHashMap::new);
+                headers.put("HOST", headers.getOrDefault("HOST", httpRequestVO.getAddress()));
+
+                String requestLine = httpRequestVO.getMethod() + " " + httpRequestVO.getQueryString() + " HTTP/1.1 \r\n";
+                String requestStr = headers.entrySet().stream().map(e -> e.getKey() + ":" + e.getValue()).collect(Collectors.joining("\r\n", requestLine, "\r\n\r\n"));
+                ByteBuffer item = ByteBuffer.wrap(requestStr.getBytes("UTF-8"));
+                httpRequestVO.setByteBuffer(item);
+                return item;
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    /**
+     * 解析出响应头
+     *
+     * @param b
+     * @param httpResponseVO
+     */
+    private void headerHandler(byte b, HttpResponseVO httpResponseVO) {
+        Integer headerIndex = httpResponseVO.getHeaderIndex();
+        byte[] originHeader = httpResponseVO.getOriginHeader();
+        if (originHeader.length == headerIndex) {
+            originHeader = httpResponseVO.setGetOriginHeader(byteExpansion(originHeader));
+        }
+        originHeader[headerIndex++] = b;
+        if (originHeader[headerIndex - 1] == '\n' && originHeader[headerIndex - 2] == '\r' && originHeader[headerIndex - 3] == '\n' && originHeader[headerIndex - 4] == '\r') {
+            headerIndex = -1;
+            String headerStr = new String(originHeader);
+            String[] headerList = headerStr.split("\r\n");
+            String[] responseLine = headerList[0].split(" ");
+            httpResponseVO.setProtocol(responseLine[0]);
+            httpResponseVO.setStatusMsg(responseLine[2]);
+            httpResponseVO.setStatusCode(Integer.parseInt(responseLine[1]));
+            httpResponseVO.setHeaders(Arrays.stream(headerList).skip(1).filter(h -> h.contains(":")).collect(Collectors.groupingBy(h -> h.split(":")[0], LinkedHashMap::new, Collectors.mapping(h -> h.split(":")[1].trim(), Collectors.toList()))));
+        }
+        httpResponseVO.setHeaderIndex(headerIndex);
+    }
+
+
+    public static void main(String[] args) throws IOException, InterruptedException {
         HttpServiceImpl httpService = new HttpServiceImpl();
         IntStream.range(0, 2).forEach(i -> {
-            httpService.doGet("www.tietuku.com/album/1735537-2", httpResponseVO->{
+            httpService.doGet("www.tietuku.com/album/1735537-2", httpResponseVO -> {
                 System.out.println(new String(httpResponseVO.getBody()));
             });
         });
-        try {
-            httpService.nioMonitor();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        Thread.sleep(2000);
+
     }
 
 }
