@@ -12,6 +12,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -24,6 +25,10 @@ import static com.net.nio.utils.DataUtil.byteExpansion;
  * @description
  */
 public class HttpServiceImpl extends NioAbstract implements HttpService {
+
+    public HttpServiceImpl(ExecutorService threadPool) {
+        super(threadPool);
+    }
 
     @Override
     protected void writeHandler(SelectionKey selectionKey) throws IOException {
@@ -183,18 +188,6 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
             httpResponseVO.setHeaders(Arrays.stream(headerList).skip(1).filter(h -> h.contains(":")).collect(Collectors.groupingBy(h -> h.split(":")[0], LinkedHashMap::new, Collectors.mapping(h -> h.split(":")[1].trim(), Collectors.toList()))));
         }
         httpResponseVO.setHeaderIndex(headerIndex);
-    }
-
-
-    public static void main(String[] args) throws IOException, InterruptedException {
-        HttpServiceImpl httpService = new HttpServiceImpl();
-        IntStream.range(0, 2).forEach(i -> {
-            httpService.doGet("www.tietuku.com/album/1735537-2", httpResponseVO -> {
-                System.out.println(new String(httpResponseVO.getBody()));
-            });
-        });
-        Thread.sleep(2000);
-        httpService.stopNioMonitor();
     }
 
 }

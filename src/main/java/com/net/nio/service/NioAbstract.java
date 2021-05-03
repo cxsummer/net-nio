@@ -24,15 +24,12 @@ public abstract class NioAbstract {
 
     protected Selector selector;
     private Thread nioMonitorThread;
-    protected ExecutorService threadPool = new ThreadPoolExecutor(50,
-            50,
-            0L,
-            TimeUnit.MILLISECONDS,
-            new LinkedBlockingQueue<Runnable>());
+    private ExecutorService threadPool;
 
-    public NioAbstract() {
+    public NioAbstract(ExecutorService threadPool) {
         try {
-            selector = Selector.open();
+            this.threadPool = threadPool;
+            this.selector = Selector.open();
             threadPool.submit(this::startNioMonitor);
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -77,7 +74,7 @@ public abstract class NioAbstract {
     /**
      * 停止nio监听
      */
-    protected void stopNioMonitor() {
+    public void stopNioMonitor() {
         nioMonitorThread.interrupt();
     }
 
