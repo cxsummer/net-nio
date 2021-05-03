@@ -1,5 +1,8 @@
 package com.net.nio.service;
 
+import com.net.nio.utils.RunnableTe;
+import lombok.extern.slf4j.Slf4j;
+
 import java.io.IOException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -9,15 +12,19 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import static com.net.nio.utils.RunnableTe.exchangeRunnable;
+
 /**
  * @author caojiancheng
  * @date 2021/5/2
  * @description
  */
+@Slf4j
 public abstract class NioAbstract {
 
     protected Selector selector;
-    protected ExecutorService threadLocal = new ThreadPoolExecutor(50,
+    private Thread nioMonitorThread;
+    protected ExecutorService threadPool = new ThreadPoolExecutor(50,
             50,
             0L,
             TimeUnit.MILLISECONDS,
@@ -26,13 +33,14 @@ public abstract class NioAbstract {
     public NioAbstract() {
         try {
             selector = Selector.open();
-            threadLocal.submit(this::startNioMonitor);
+            threadPool.submit(this::startNioMonitor);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
     /**
+     * 开启nio监听
      * 因为select方法执行的是lockAndDoSelect方法，里面是用的synchronized锁住的SelectorImpl类的publicKeys变量
      * 那么selector.select就不能阻塞，因为一旦selector阻塞，而根据锁的可重入性，当前线程可以直接执行但是别的线程需要等待锁的释放
      * select先执行，如果selector.select查询不到可用的连接，那么就不会释放锁，而只有向selector注册连接才会有可用连接
@@ -40,7 +48,8 @@ public abstract class NioAbstract {
      * 所以要用selector.selectNow方法，查询到或者查不到都会释放锁，不会在获取到锁后阻塞
      */
     private void startNioMonitor() {
-        while (!Thread.currentThread().isInterrupted()) {
+        nioMonitorThread = Thread.currentThread();
+        while (!nioMonitorThread.isInterrupted()) {
             try {
                 if (selector.selectNow() <= 0) {
                     continue;
@@ -51,20 +60,25 @@ public abstract class NioAbstract {
                     iterator.remove();
                     if (selectionKey.isWritable()) {
                         selectionKey.interestOps(0);
-                        writeHandler(selectionKey);
+                        threadPool.submit(exchangeRunnable(() -> writeHandler(selectionKey), Exception::printStackTrace));
                     } else if (selectionKey.isReadable()) {
                         selectionKey.interestOps(0);
-                        readHandler(selectionKey);
+                        threadPool.submit(exchangeRunnable(() -> readHandler(selectionKey), Exception::printStackTrace));
                     }
                 }
             } catch (Exception e) {
                 e.printStackTrace();
             }
         }
+        log.info("停止nio监听");
     }
 
-    protected void stopNioMonitor() {
 
+    /**
+     * 停止nio监听
+     */
+    protected void stopNioMonitor() {
+        nioMonitorThread.interrupt();
     }
 
     /**

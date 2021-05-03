@@ -194,7 +194,7 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
             });
         });
         Thread.sleep(2000);
-
+        httpService.stopNioMonitor();
     }
 
 }
