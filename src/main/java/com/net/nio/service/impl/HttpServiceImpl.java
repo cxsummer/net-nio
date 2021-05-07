@@ -4,6 +4,7 @@ import com.net.nio.model.HttpRequestVO;
 import com.net.nio.model.HttpResponseVO;
 import com.net.nio.service.HttpService;
 import com.net.nio.service.NioAbstract;
+import com.net.nio.utils.GzipUtils;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -14,6 +15,7 @@ import java.nio.channels.SocketChannel;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -59,6 +61,7 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
      */
     @Override
     protected void readHandler(SelectionKey selectionKey) throws IOException {
+        boolean isEnd = false;
         Integer chunkedNum = null;
         Integer contentLength = null;
         String transferEncoding = null;
@@ -84,18 +87,16 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
                     if (contentLength != -1) {
                         body[httpResponseVO.getIncrementBodyIndex()] = b;
                         if (httpResponseVO.getBodyIndex().equals(contentLength)) {
-                            socketChannel.close();
-                            httpResponseVO.getConsumer().accept(httpResponseVO);
-                            return;
+                            isEnd = true;
+                            break;
                         }
                     } else if ("chunked".equals(transferEncoding)) {
                         String chunked = httpResponseVO.getChunked();
                         if (chunked.endsWith("\r\n")) {
                             chunkedNum = Optional.ofNullable(chunkedNum).orElseGet(() -> Integer.parseInt(chunked.replace("\r\n", ""), 16));
                             if (chunkedNum == 0) {
-                                socketChannel.close();
-                                httpResponseVO.getConsumer().accept(httpResponseVO);
-                                return;
+                                isEnd = true;
+                                break;
                             }
                             body[httpResponseVO.getIncrementBodyIndex()] = b;
                             if (httpResponseVO.getBodyIndex() - httpResponseVO.getChunkedInitIndex() == chunkedNum) {
@@ -108,6 +109,12 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
                         }
                     }
                 }
+            }
+            if (isEnd) {
+                socketChannel.close();
+                contentDecode(httpResponseVO);
+                httpResponseVO.getConsumer().accept(httpResponseVO);
+                return;
             }
             byteBuffer.clear();
         }
@@ -188,6 +195,20 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
             httpResponseVO.setHeaders(Arrays.stream(headerList).skip(1).filter(h -> h.contains(":")).collect(Collectors.groupingBy(h -> h.split(":")[0], LinkedHashMap::new, Collectors.mapping(h -> h.split(":")[1].trim(), Collectors.toList()))));
         }
         httpResponseVO.setHeaderIndex(headerIndex);
+    }
+
+    /**
+     * 解码报文体
+     *
+     * @param httpResponseVO
+     */
+    private void contentDecode(HttpResponseVO httpResponseVO) {
+        String contentEncoding = Optional.ofNullable(httpResponseVO.getHeaders().get("Content-Encoding")).filter(Objects::nonNull).map(h -> h.get(0)).orElseGet(String::new);
+        switch (contentEncoding) {
+            case "gzip":
+                httpResponseVO.setBody(GzipUtils.uncompress(httpResponseVO.getBody()));
+                break;
+        }
     }
 
 }

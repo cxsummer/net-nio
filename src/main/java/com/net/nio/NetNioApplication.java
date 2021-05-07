@@ -3,21 +3,10 @@ package com.net.nio;
 import com.net.nio.service.HttpService;
 import com.net.nio.service.NioAbstract;
 import com.net.nio.service.impl.HttpServiceImpl;
+import com.net.nio.utils.GzipUtils;
 import lombok.extern.slf4j.Slf4j;
 
-import javax.imageio.ImageIO;
-import java.awt.*;
-import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
-import java.nio.channels.SocketChannel;
-import java.nio.charset.Charset;
-import java.util.Arrays;
-import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -40,10 +29,14 @@ public class NetNioApplication {
                 new LinkedBlockingQueue<Runnable>());
 
         HttpService httpService = new HttpServiceImpl(threadPool);
-        IntStream.range(0, 2).forEach(i -> {
+        IntStream.range(0, 1).forEach(i -> {
             httpService.doGet("www.tietuku.com/album/1735537-2", httpResponseVO -> {
-                System.out.println(new String(httpResponseVO.getBody()));
-            });
+                System.out.println(new String(httpResponseVO.getOriginHeader()));
+                String res= new String(httpResponseVO.getBody());
+                System.out.println(res);
+            },new LinkedHashMap(){{
+                put("Accept-Encoding","gzip, deflate");
+            }});
         });
         Thread.sleep(2000);
         ((NioAbstract) httpService).stopNioMonitor();

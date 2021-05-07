@@ -39,16 +39,16 @@ public class HttpResponseVO {
      * 原始响应头
      */
     private byte[] originHeader;
+    
+    /**
+     * 响应头
+     */
+    private LinkedHashMap<String, List<String>> headers;
 
     /**
      * 响应体下标
      */
     private Integer bodyIndex;
-
-    /**
-     * 响应头
-     */
-    private LinkedHashMap<String, List<String>> headers;
 
     /**
      * 响应体

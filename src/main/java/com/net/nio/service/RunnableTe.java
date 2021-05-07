@@ -1,4 +1,4 @@
-package com.net.nio.utils;
+package com.net.nio.service;
 
 import java.util.function.Consumer;
 import java.util.function.Function;
