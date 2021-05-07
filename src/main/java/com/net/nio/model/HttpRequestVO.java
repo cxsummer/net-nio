@@ -41,6 +41,11 @@ public class HttpRequestVO {
     private LinkedHashMap headers;
 
     /**
+     * 请求体
+     */
+    private byte[] body;
+
+    /**
      * 回调方法
      */
     Consumer<HttpResponseVO> consumer;

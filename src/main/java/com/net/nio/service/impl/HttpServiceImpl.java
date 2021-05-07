@@ -10,15 +10,13 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
+import static com.net.nio.utils.DataUtil.byteConcat;
 import static com.net.nio.utils.DataUtil.byteExpansion;
 
 /**
@@ -77,8 +75,8 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
                     headerHandler(b, httpResponseVO);
                 } else {
                     LinkedHashMap<String, List<String>> headers = httpResponseVO.getHeaders();
-                    transferEncoding = Optional.ofNullable(transferEncoding).orElseGet(() -> Optional.ofNullable(headers.get("Transfer-Encoding")).filter(Objects::nonNull).map(c -> c.get(0)).orElse(""));
-                    contentLength = Optional.ofNullable(contentLength).orElseGet(() -> Optional.ofNullable(headers.get("Content-Length")).filter(Objects::nonNull).map(c -> Integer.parseInt(c.get(0))).orElse(-1));
+                    transferEncoding = Optional.ofNullable(transferEncoding).orElseGet(() -> Optional.ofNullable(headers.get("Transfer-Encoding")).map(c -> c.get(0)).orElse(""));
+                    contentLength = Optional.ofNullable(contentLength).orElseGet(() -> Optional.ofNullable(headers.get("Content-Length")).map(c -> Integer.parseInt(c.get(0))).orElse(-1));
 
                     if (body.length == httpResponseVO.getBodyIndex()) {
                         body = httpResponseVO.setGetBody(byteExpansion(body));
@@ -138,7 +136,7 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
             httpRequestVO.setAddress(address);
             httpRequestVO.setConsumer(consumer);
             httpRequestVO.setPath(uri.substring(pathIndex));
-            Optional.ofNullable(headers).filter(Objects::nonNull).filter(h -> h.length > 0).map(h -> h[0]).ifPresent(httpRequestVO::setHeaders);
+            Optional.ofNullable(headers).filter(h -> h.length > 0).map(h -> h[0]).ifPresent(httpRequestVO::setHeaders);
 
             SocketChannel socketChannel = SocketChannel.open(new InetSocketAddress(address, port));
             socketChannel.configureBlocking(false);
@@ -161,8 +159,8 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
                 headers.put("HOST", headers.getOrDefault("HOST", httpRequestVO.getAddress()));
 
                 String requestLine = httpRequestVO.getMethod() + " " + httpRequestVO.getPath() + " HTTP/1.1 \r\n";
-                String requestStr = headers.entrySet().stream().map(e -> e.getKey() + ":" + e.getValue()).collect(Collectors.joining("\r\n", requestLine, "\r\n\r\n"));
-                ByteBuffer item = ByteBuffer.wrap(requestStr.getBytes("UTF-8"));
+                byte[] request = headers.entrySet().stream().map(e -> e.getKey() + ":" + e.getValue()).collect(Collectors.joining("\r\n", requestLine, "\r\n\r\n")).getBytes("UTF-8");
+                ByteBuffer item = ByteBuffer.wrap(Optional.ofNullable(httpRequestVO.getBody()).map(b -> byteConcat(request, b)).orElse(request));
                 httpRequestVO.setByteBuffer(item);
                 return item;
             } catch (Exception e) {
@@ -192,7 +190,7 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
             httpResponseVO.setProtocol(responseLine[0]);
             httpResponseVO.setStatusMsg(responseLine[2]);
             httpResponseVO.setStatusCode(Integer.parseInt(responseLine[1]));
-            httpResponseVO.setHeaders(Arrays.stream(headerList).skip(1).filter(h -> h.contains(":")).collect(Collectors.groupingBy(h -> h.split(":")[0], LinkedHashMap::new, Collectors.mapping(h -> h.split(":")[1].trim(), Collectors.toList()))));
+            httpResponseVO.setHeaders(Arrays.stream(headerList).skip(1).filter(h -> h.contains(":")).collect(Collectors.groupingBy(h -> h.split(":")[0].trim(), LinkedHashMap::new, Collectors.mapping(h -> h.split(":")[1].trim(), Collectors.toList()))));
         }
         httpResponseVO.setHeaderIndex(headerIndex);
     }
@@ -203,7 +201,7 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
      * @param httpResponseVO
      */
     private void contentDecode(HttpResponseVO httpResponseVO) {
-        String contentEncoding = Optional.ofNullable(httpResponseVO.getHeaders().get("Content-Encoding")).filter(Objects::nonNull).map(h -> h.get(0)).orElseGet(String::new);
+        String contentEncoding = Optional.ofNullable(httpResponseVO.getHeaders().get("Content-Encoding")).map(h -> h.get(0)).orElseGet(String::new);
         switch (contentEncoding) {
             case "gzip":
                 httpResponseVO.setBody(GzipUtils.uncompress(httpResponseVO.getBody()));
