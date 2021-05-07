@@ -1,5 +1,7 @@
 package com.net.nio.service;
 
+import com.net.nio.model.HttpRequestVO;
+import com.net.nio.model.HttpResponseVO;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
@@ -53,10 +55,12 @@ public abstract class NioAbstract {
                     iterator.remove();
                     if (selectionKey.isWritable()) {
                         selectionKey.interestOps(0);
-                        threadPool.submit(exchangeRunnable(() -> writeHandler(selectionKey), Exception::printStackTrace));
+                        HttpRequestVO httpRequestVO = (HttpRequestVO) selectionKey.attachment();
+                        threadPool.submit(exchangeRunnable(() -> writeHandler(selectionKey), httpRequestVO.getExceptionHandler()));
                     } else if (selectionKey.isReadable()) {
                         selectionKey.interestOps(0);
-                        threadPool.submit(exchangeRunnable(() -> readHandler(selectionKey), Exception::printStackTrace));
+                        HttpResponseVO httpResponseVO = (HttpResponseVO) selectionKey.attachment();
+                        threadPool.submit(exchangeRunnable(() -> readHandler(selectionKey), httpResponseVO.getExceptionHandler()));
                     }
                 }
             } catch (Exception e) {

@@ -13,11 +13,33 @@ import java.util.function.Consumer;
 public interface HttpService {
 
     /**
-     * http get请求
+     * get 请求
      *
-     * @param uri
-     * @param consumer
-     * @param headers
+     * @param uri      地址
+     * @param callBack 回调
+     * @param headers  请求头
      */
-    void doGet(String uri, Consumer<HttpResponseVO> consumer, LinkedHashMap... headers);
+    void doGet(String uri, Consumer<HttpResponseVO> callBack, LinkedHashMap... headers);
+
+    /**
+     * get 请求
+     *
+     * @param uri              地址
+     * @param callBack         回调
+     * @param exceptionHandler 异常处理
+     * @param headers          请求头
+     */
+    void doGet(String uri, Consumer<HttpResponseVO> callBack, Consumer<Exception> exceptionHandler, LinkedHashMap... headers);
+    
+    /**
+     * http 请求
+     *
+     * @param uri              地址
+     * @param method           请求方法
+     * @param body             报文体
+     * @param callBack         回调
+     * @param exceptionHandler 异常处理
+     * @param headers          请求头
+     */
+    void doRequest(String uri, String method, byte[] body, Consumer<HttpResponseVO> callBack, Consumer<Exception> exceptionHandler, LinkedHashMap... headers);
 }

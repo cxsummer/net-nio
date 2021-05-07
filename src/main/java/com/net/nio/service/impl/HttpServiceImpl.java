@@ -44,7 +44,8 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
             httpResponseVO.setHeaderIndex(0);
             httpResponseVO.setBody(new byte[1024]);
             httpResponseVO.setOriginHeader(new byte[1024]);
-            httpResponseVO.setConsumer(httpRequestVO.getConsumer());
+            httpResponseVO.setCallBack(httpRequestVO.getCallBack());
+            httpResponseVO.setExceptionHandler(httpRequestVO.getExceptionHandler());
             selectionKey.attach(httpResponseVO);
             selectionKey.interestOps(SelectionKey.OP_READ);
         } else {
@@ -111,7 +112,7 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
             if (isEnd) {
                 socketChannel.close();
                 contentDecode(httpResponseVO);
-                httpResponseVO.getConsumer().accept(httpResponseVO);
+                httpResponseVO.getCallBack().accept(httpResponseVO);
                 return;
             }
             byteBuffer.clear();
@@ -120,7 +121,17 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
     }
 
     @Override
-    public void doGet(String uri, Consumer<HttpResponseVO> consumer, LinkedHashMap... headers) {
+    public void doGet(String uri, Consumer<HttpResponseVO> callBack, LinkedHashMap... headers) {
+        doRequest(uri, "GET", null, callBack, Exception::printStackTrace, headers);
+    }
+
+    @Override
+    public void doGet(String uri, Consumer<HttpResponseVO> callBack, Consumer<Exception> exceptionHandler, LinkedHashMap... headers) {
+        doRequest(uri, "GET", null, callBack, exceptionHandler, headers);
+    }
+
+    @Override
+    public void doRequest(String uri, String method, byte[] body, Consumer<HttpResponseVO> callBack, Consumer<Exception> exceptionHandler, LinkedHashMap... headers) {
         try {
             int port = 80;
             int pathIndex = uri.indexOf("/");
@@ -131,11 +142,13 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
                 address = address.substring(0, portIndex);
             }
             HttpRequestVO httpRequestVO = new HttpRequestVO();
+            httpRequestVO.setBody(body);
             httpRequestVO.setPort(port);
-            httpRequestVO.setMethod("GET");
+            httpRequestVO.setMethod(method);
             httpRequestVO.setAddress(address);
-            httpRequestVO.setConsumer(consumer);
+            httpRequestVO.setCallBack(callBack);
             httpRequestVO.setPath(uri.substring(pathIndex));
+            httpRequestVO.setExceptionHandler(exceptionHandler);
             Optional.ofNullable(headers).filter(h -> h.length > 0).map(h -> h[0]).ifPresent(httpRequestVO::setHeaders);
 
             SocketChannel socketChannel = SocketChannel.open(new InetSocketAddress(address, port));

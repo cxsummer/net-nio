@@ -48,7 +48,12 @@ public class HttpRequestVO {
     /**
      * 回调方法
      */
-    Consumer<HttpResponseVO> consumer;
+    Consumer<HttpResponseVO> callBack;
+
+    /**
+     * 异常处理
+     */
+    Consumer<Exception> exceptionHandler;
 
     /**
      * 写入的ByteBuffer

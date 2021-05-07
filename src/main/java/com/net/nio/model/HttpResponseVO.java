@@ -39,7 +39,7 @@ public class HttpResponseVO {
      * 原始响应头
      */
     private byte[] originHeader;
-    
+
     /**
      * 响应头
      */
@@ -69,7 +69,12 @@ public class HttpResponseVO {
     /**
      * 回调方法
      */
-    Consumer<HttpResponseVO> consumer;
+    Consumer<HttpResponseVO> callBack;
+
+    /**
+     * 异常处理
+     */
+    Consumer<Exception> exceptionHandler;
 
     public byte[] setGetBody(byte[] body) {
         this.body = body;
