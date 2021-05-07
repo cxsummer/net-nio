@@ -59,6 +59,7 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
      */
     @Override
     protected void readHandler(SelectionKey selectionKey) throws IOException {
+        Integer chunkedNum = null;
         Integer contentLength = null;
         String transferEncoding = null;
         SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
@@ -90,7 +91,7 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
                     } else if ("chunked".equals(transferEncoding)) {
                         String chunked = httpResponseVO.getChunked();
                         if (chunked.endsWith("\r\n")) {
-                            Integer chunkedNum = Integer.parseInt(chunked.replace("\r\n", ""), 16);
+                            chunkedNum = Optional.ofNullable(chunkedNum).orElseGet(() -> Integer.parseInt(chunked.replace("\r\n", ""), 16));
                             if (chunkedNum == 0) {
                                 socketChannel.close();
                                 httpResponseVO.getConsumer().accept(httpResponseVO);
@@ -99,10 +100,9 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
                             body[httpResponseVO.getIncrementBodyIndex()] = b;
                             if (httpResponseVO.getBodyIndex() - httpResponseVO.getChunkedInitIndex() == chunkedNum) {
                                 httpResponseVO.setChunked("");
+                                chunkedNum = null;
                             }
-                        } else if (chunked.equals("") && (b == '\r' || b == '\n')) {
-                            continue;
-                        } else {
+                        } else if (!chunked.equals("") || (b != '\r' && b != '\n')) {
                             httpResponseVO.setChunkedInitIndex(httpResponseVO.getBodyIndex());
                             httpResponseVO.setChunked(chunked + new String(new byte[]{b}));
                         }
