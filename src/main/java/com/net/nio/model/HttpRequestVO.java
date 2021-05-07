@@ -33,7 +33,7 @@ public class HttpRequestVO {
     /**
      * 请求参数字符串
      */
-    private String queryString;
+    private String path;
 
     /**
      * 请求头

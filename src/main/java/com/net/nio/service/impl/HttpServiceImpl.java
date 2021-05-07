@@ -137,7 +137,7 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
             httpRequestVO.setMethod("GET");
             httpRequestVO.setAddress(address);
             httpRequestVO.setConsumer(consumer);
-            httpRequestVO.setQueryString(uri.substring(pathIndex));
+            httpRequestVO.setPath(uri.substring(pathIndex));
             Optional.ofNullable(headers).filter(Objects::nonNull).filter(h -> h.length > 0).map(h -> h[0]).ifPresent(httpRequestVO::setHeaders);
 
             SocketChannel socketChannel = SocketChannel.open(new InetSocketAddress(address, port));
@@ -160,7 +160,7 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
                 Map<String, Object> headers = Optional.ofNullable(httpRequestVO.getHeaders()).orElseGet(LinkedHashMap::new);
                 headers.put("HOST", headers.getOrDefault("HOST", httpRequestVO.getAddress()));
 
-                String requestLine = httpRequestVO.getMethod() + " " + httpRequestVO.getQueryString() + " HTTP/1.1 \r\n";
+                String requestLine = httpRequestVO.getMethod() + " " + httpRequestVO.getPath() + " HTTP/1.1 \r\n";
                 String requestStr = headers.entrySet().stream().map(e -> e.getKey() + ":" + e.getValue()).collect(Collectors.joining("\r\n", requestLine, "\r\n\r\n"));
                 ByteBuffer item = ByteBuffer.wrap(requestStr.getBytes("UTF-8"));
                 httpRequestVO.setByteBuffer(item);
