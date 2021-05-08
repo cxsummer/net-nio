@@ -39,15 +39,17 @@ public interface RunnableTe {
     /**
      * RunnableTe转Runnable
      *
-     * @param runnableTe
-     * @param consumers
+     * @param runnableTe   真正处理逻辑
+     * @param consumers    异常处理
+     * @param preException 异常前置处理
      * @return
      */
-    static Runnable exchangeRunnable(RunnableTe runnableTe, Consumer<Exception> consumers) {
+    static Runnable exchangeRunnable(RunnableTe runnableTe, Consumer<Exception> consumers, Runnable preException) {
         return () -> {
             try {
                 runnableTe.run();
             } catch (Exception e) {
+                preException.run();
                 consumers.accept(e);
             }
         };

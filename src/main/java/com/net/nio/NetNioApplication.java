@@ -3,7 +3,6 @@ package com.net.nio;
 import com.net.nio.service.HttpService;
 import com.net.nio.service.NioAbstract;
 import com.net.nio.service.impl.HttpServiceImpl;
-import com.net.nio.utils.GzipUtils;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.LinkedHashMap;
@@ -30,7 +29,7 @@ public class NetNioApplication {
 
         HttpService httpService = new HttpServiceImpl(threadPool);
         IntStream.range(0, 1).forEach(i -> {
-            httpService.doGet("www.tietuku.com/album/1735537-2", httpResponseVO -> {
+            httpService.doGet("https://www.cnblogs.com/hanfanfan/p/9565089.html", httpResponseVO -> {
                 System.out.println(new String(httpResponseVO.getOriginHeader()));
                 String res= new String(httpResponseVO.getBody());
                 System.out.println(res);
@@ -38,7 +37,7 @@ public class NetNioApplication {
                 put("Accept-Encoding","gzip, deflate");
             }});
         });
-        Thread.sleep(2000);
+        Thread.sleep(5000);
         ((NioAbstract) httpService).stopNioMonitor();
         threadPool.shutdownNow();
     }

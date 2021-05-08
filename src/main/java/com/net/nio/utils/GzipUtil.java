@@ -11,7 +11,7 @@ import java.util.zip.GZIPOutputStream;
  * @date 2021/5/7
  * @description
  */
-public class GzipUtils {
+public class GzipUtil {
 
     public static byte[] compress(String str, String encoding) {
         if (str == null || str.length() == 0) {

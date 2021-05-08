@@ -4,7 +4,8 @@ import com.net.nio.model.HttpRequestVO;
 import com.net.nio.model.HttpResponseVO;
 import com.net.nio.service.HttpService;
 import com.net.nio.service.NioAbstract;
-import com.net.nio.utils.GzipUtils;
+import com.net.nio.utils.Assert;
+import com.net.nio.utils.GzipUtil;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -14,6 +15,8 @@ import java.nio.channels.SocketChannel;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static com.net.nio.utils.DataUtil.byteConcat;
@@ -25,6 +28,8 @@ import static com.net.nio.utils.DataUtil.byteExpansion;
  * @description
  */
 public class HttpServiceImpl extends NioAbstract implements HttpService {
+
+    private Pattern httpPattern = Pattern.compile("http[s]{0,1}://.*?");
 
     public HttpServiceImpl(ExecutorService threadPool) {
         super(threadPool);
@@ -57,6 +62,7 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
      * 如果Content-Length存在，那么报文体的长度就是从head（第一个\r\n\r\n）后的字节数
      * 如果Transfer-Encoding等于chunked，那么报文体是分段返回的，从head（第一个\r\n\r\n）后开始，每一段的开始是  当前段长度（16进制）\r\n 结束是 \r\n 中间的字节就是段内容，其字节数等于当前段长度
      * 关闭socketChannel，当再次执行selector.select()时，会将此socketChannel从selector中移除，所以读取完毕后需要执行socketChannel.close()
+     * 当调用SelectionKey的cancel()方法或关闭与SelectionKey关联的Channel或与SelectionKey关联的Selector被关闭。SelectionKey对象会失效，意味着Selector再也不会监控与它相关的事件
      */
     @Override
     protected void readHandler(SelectionKey selectionKey) throws IOException {
@@ -122,7 +128,7 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
 
     @Override
     public void doGet(String uri, Consumer<HttpResponseVO> callBack, LinkedHashMap... headers) {
-        doRequest(uri, "GET", null, callBack, Exception::printStackTrace, headers);
+        doGet(uri, callBack, Exception::printStackTrace, headers);
     }
 
     @Override
@@ -133,10 +139,15 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
     @Override
     public void doRequest(String uri, String method, byte[] body, Consumer<HttpResponseVO> callBack, Consumer<Exception> exceptionHandler, LinkedHashMap... headers) {
         try {
-            int port = 80;
+            Matcher matcher = httpPattern.matcher(uri);
+            Assert.isTrue(matcher.matches(), "uri格式错误");
+            int pIndex = uri.indexOf(":");
+            String protocol = uri.substring(0, pIndex);
+            uri = uri.substring(pIndex + 3);
             int pathIndex = uri.indexOf("/");
             String address = uri.substring(0, pathIndex);
             int portIndex = address.indexOf(":");
+            int port = "http".equals(protocol) ? 80 : 443;
             if (portIndex > -1) {
                 port = Integer.parseInt(address.substring(portIndex + 1));
                 address = address.substring(0, portIndex);
@@ -146,6 +157,7 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
             httpRequestVO.setPort(port);
             httpRequestVO.setMethod(method);
             httpRequestVO.setAddress(address);
+            httpRequestVO.setProtocol(protocol);
             httpRequestVO.setCallBack(callBack);
             httpRequestVO.setPath(uri.substring(pathIndex));
             httpRequestVO.setExceptionHandler(exceptionHandler);
@@ -217,7 +229,7 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
         String contentEncoding = Optional.ofNullable(httpResponseVO.getHeaders().get("Content-Encoding")).map(h -> h.get(0)).orElseGet(String::new);
         switch (contentEncoding) {
             case "gzip":
-                httpResponseVO.setBody(GzipUtils.uncompress(httpResponseVO.getBody()));
+                httpResponseVO.setBody(GzipUtil.uncompress(httpResponseVO.getBody()));
                 break;
         }
     }

@@ -31,6 +31,11 @@ public class HttpRequestVO {
     private String method;
 
     /**
+     * 协议
+     */
+    private String protocol;
+
+    /**
      * 请求参数字符串
      */
     private String path;
