@@ -59,6 +59,7 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
     }
 
     /**
+     * 读结束的标志：1.socketChannel.read返回为-1（发送方主动断开）。2.读取到足够的字节
      * 如果Content-Length存在，那么报文体的长度就是从head（第一个\r\n\r\n）后的字节数
      * 如果Transfer-Encoding等于chunked，那么报文体是分段返回的，从head（第一个\r\n\r\n）后开始，每一段的开始是  当前段长度（16进制）\r\n 结束是 \r\n 中间的字节就是段内容，其字节数等于当前段长度
      * 关闭socketChannel，当再次执行selector.select()时，会将此socketChannel从selector中移除，所以读取完毕后需要执行socketChannel.close()
@@ -66,7 +67,7 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
      */
     @Override
     protected void readHandler(SelectionKey selectionKey) throws IOException {
-        boolean isEnd = false;
+        int num;
         Integer chunkedNum = null;
         Integer contentLength = null;
         String transferEncoding = null;
@@ -74,7 +75,7 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
         ByteBuffer byteBuffer = ByteBuffer.allocate(1024 * 1024);
         HttpResponseVO httpResponseVO = (HttpResponseVO) selectionKey.attachment();
         byte[] body = httpResponseVO.getBody();
-        while (socketChannel.read(byteBuffer) > 0) {
+        while ((num = socketChannel.read(byteBuffer)) != 0) {
             byteBuffer.flip();
             for (int i = 0; i < byteBuffer.limit(); i++) {
                 byte b = byteBuffer.get(i);
@@ -92,7 +93,7 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
                     if (contentLength != -1) {
                         body[httpResponseVO.getIncrementBodyIndex()] = b;
                         if (httpResponseVO.getBodyIndex().equals(contentLength)) {
-                            isEnd = true;
+                            num = -1;
                             break;
                         }
                     } else if ("chunked".equals(transferEncoding)) {
@@ -100,7 +101,7 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
                         if (chunked.endsWith("\r\n")) {
                             chunkedNum = Optional.ofNullable(chunkedNum).orElseGet(() -> Integer.parseInt(chunked.replace("\r\n", ""), 16));
                             if (chunkedNum == 0) {
-                                isEnd = true;
+                                num = -1;
                                 break;
                             }
                             body[httpResponseVO.getIncrementBodyIndex()] = b;
@@ -115,7 +116,7 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
                     }
                 }
             }
-            if (isEnd) {
+            if (num == -1) {
                 socketChannel.close();
                 contentDecode(httpResponseVO);
                 httpResponseVO.getCallBack().accept(httpResponseVO);
