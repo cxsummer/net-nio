@@ -58,6 +58,11 @@ public class HttpResponseVO {
     /**
      * 分段长度
      */
+    private Integer chunkedNum;
+
+    /**
+     * 分段长度
+     */
     private String chunked;
 
 

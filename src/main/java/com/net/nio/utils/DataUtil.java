@@ -13,10 +13,11 @@ public class DataUtil {
      * byte数组扩容
      *
      * @param origin
+     * @param num
      * @return
      */
-    public static byte[] byteExpansion(byte[] origin) {
-        byte[] temp = new byte[origin.length + 1024];
+    public static byte[] byteExpansion(byte[] origin, int num) {
+        byte[] temp = new byte[origin.length + num];
         IntStream.range(0, origin.length).forEach(i -> temp[i] = origin[i]);
         return temp;
     }

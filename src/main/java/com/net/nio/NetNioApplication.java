@@ -29,7 +29,7 @@ public class NetNioApplication {
 
         HttpService httpService = new HttpServiceImpl(threadPool);
         IntStream.range(0, 1).forEach(i -> {
-            httpService.doGet("www.tietuku.com/album/1735537-2", httpResponseVO -> {
+            httpService.doGet("http://www.tietuku.com/album/1735537-2", httpResponseVO -> {
                 System.out.println(new String(httpResponseVO.getOriginHeader()));
                 String res= new String(httpResponseVO.getBody());
                 System.out.println(res);
