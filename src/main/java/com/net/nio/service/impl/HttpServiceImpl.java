@@ -104,11 +104,11 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
                                 httpResponseVO.setChunked("");
                             }
                         } else if (!chunked.equals("") || (b != '\r' && b != '\n')) {
-                            httpResponseVO.setChunkedInitIndex(httpResponseVO.getBodyIndex());
                             httpResponseVO.setChunked(chunked + new String(new byte[]{b}));
                             if (b == '\r') {
                                 chunkedNum = Integer.parseInt(chunked, 16);
                                 httpResponseVO.setBody(byteExpansion(body, chunkedNum));
+                                httpResponseVO.setChunkedInitIndex(httpResponseVO.getBodyIndex());
                             }
                         }
                     }
@@ -143,6 +143,7 @@ public class HttpServiceImpl extends NioAbstract implements HttpService {
             int pIndex = uri.indexOf(":");
             String protocol = uri.substring(0, pIndex);
             uri = uri.substring(pIndex + 3);
+            uri = uri.contains("/") ? uri : uri + "/";
             int pathIndex = uri.indexOf("/");
             String address = uri.substring(0, pathIndex);
             int portIndex = address.indexOf(":");
