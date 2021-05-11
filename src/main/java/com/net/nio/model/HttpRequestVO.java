@@ -2,6 +2,8 @@ package com.net.nio.model;
 
 import lombok.Data;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
 import java.nio.ByteBuffer;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -23,7 +25,7 @@ public class HttpRequestVO {
     /**
      * 请求地址
      */
-    private String address;
+    private String host;
 
     /**
      * 请求方式
@@ -64,4 +66,9 @@ public class HttpRequestVO {
      * 写入的ByteBuffer
      */
     private ByteBuffer byteBuffer;
+
+    /**
+     * ssl引擎
+     */
+    private SSLEngine sslEngine;
 }

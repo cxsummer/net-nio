@@ -22,7 +22,7 @@ public abstract class NioAbstract {
 
     protected Selector selector;
     private Thread nioMonitorThread;
-    private ExecutorService threadPool;
+    protected ExecutorService threadPool;
 
     public NioAbstract(ExecutorService threadPool) {
         try {

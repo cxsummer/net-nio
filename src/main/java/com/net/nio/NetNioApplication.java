@@ -2,9 +2,13 @@ package com.net.nio;
 
 import com.net.nio.service.HttpService;
 import com.net.nio.service.NioAbstract;
+import com.net.nio.service.SslService;
 import com.net.nio.service.impl.HttpServiceImpl;
+import com.net.nio.service.impl.SslServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -27,14 +31,17 @@ public class NetNioApplication {
                 TimeUnit.MILLISECONDS,
                 new LinkedBlockingQueue<Runnable>());
 
-        HttpService httpService = new HttpServiceImpl(threadPool);
+        SslService sslService = new SslServiceImpl();
+        HttpService httpService = new HttpServiceImpl(sslService, threadPool);
         IntStream.range(0, 1).forEach(i -> {
-            httpService.doGet("http://www.tietuku.com/album/1735537-2", httpResponseVO -> {
+            LocalDateTime start = LocalDateTime.now();
+            httpService.doGet("https://www.ximalaya.com/youshengshu/41594201/340652654", httpResponseVO -> {
                 System.out.println(new String(httpResponseVO.getOriginHeader()));
-                String res= new String(httpResponseVO.getBody());
+                String res = new String(httpResponseVO.getBody());
                 System.out.println(res);
-            },new LinkedHashMap(){{
-                put("Accept-Encoding","gzip, deflate");
+                System.out.println(Duration.between(start, LocalDateTime.now()).toMillis());
+            }, new LinkedHashMap() {{
+                put("Accept-Encoding", "gzip, deflate");
             }});
         });
         Thread.sleep(2000);

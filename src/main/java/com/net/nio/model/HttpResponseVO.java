@@ -2,6 +2,7 @@ package com.net.nio.model;
 
 import lombok.Data;
 
+import javax.net.ssl.SSLEngine;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -80,6 +81,11 @@ public class HttpResponseVO {
      * 异常处理
      */
     Consumer<Exception> exceptionHandler;
+
+    /**
+     * ssl引擎
+     */
+    private SSLEngine sslEngine;
 
     public byte[] setGetBody(byte[] body) {
         this.body = body;
