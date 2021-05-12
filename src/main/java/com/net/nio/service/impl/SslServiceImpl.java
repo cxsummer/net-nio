@@ -38,11 +38,12 @@ public class SslServiceImpl implements SslService {
 
     @Override
     public KeyManager[] keyManagers() throws Exception {
-        KeyStore ks = KeyStore.getInstance("JKS");
+        /*KeyStore ks = KeyStore.getInstance("JKS");
         char[] passphrase = "password".toCharArray();
         ks.load(new FileInputStream("src/main/resources/keystore.jks"), passphrase);
         KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
         kmf.init(ks, passphrase);
-        return kmf.getKeyManagers();
+        return kmf.getKeyManagers();*/
+        return null;
     }
 }

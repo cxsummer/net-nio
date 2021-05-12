@@ -3,10 +3,13 @@ package com.net.nio.model;
 import lombok.Data;
 
 import javax.net.ssl.SSLEngine;
+import java.nio.ByteBuffer;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * @author caojiancheng
@@ -87,6 +90,17 @@ public class HttpResponseVO {
      */
     private SSLEngine sslEngine;
 
+
+    /**
+     * 应用数据包
+     */
+    ByteBuffer appBuffer;
+
+    /**
+     * 报文数据包
+     */
+    ByteBuffer packetBuffer;
+
     public byte[] setGetBody(byte[] body) {
         this.body = body;
         return body;
@@ -100,5 +114,19 @@ public class HttpResponseVO {
     public Integer getIncrementBodyIndex() {
         this.bodyIndex++;
         return bodyIndex - 1;
+    }
+
+    public ByteBuffer getAppBuffer(int capacity) {
+        return Optional.ofNullable(appBuffer).orElseGet(() -> {
+            appBuffer = ByteBuffer.allocate(capacity);
+            return appBuffer;
+        });
+    }
+
+    public ByteBuffer getPacketBuffer(int capacity) {
+        return Optional.ofNullable(packetBuffer).orElseGet(() -> {
+            packetBuffer = ByteBuffer.allocate(capacity);
+            return packetBuffer;
+        });
     }
 }

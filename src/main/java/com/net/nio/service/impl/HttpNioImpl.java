@@ -79,17 +79,17 @@ public class HttpNioImpl extends NioAbstract {
         HttpResponseVO httpResponseVO = (HttpResponseVO) selectionKey.attachment();
         SSLEngine sslEngine = httpResponseVO.getSslEngine();
         if (sslEngine == null) {
-            packetBuffer = ByteBuffer.allocate(10 * 1024);
+            packetBuffer = httpResponseVO.getPacketBuffer(10 * 1024);
         } else {
-            packetBuffer = ByteBuffer.allocate(sslEngine.getSession().getPacketBufferSize());
-            appBuffer = ByteBuffer.allocate(sslEngine.getSession().getApplicationBufferSize());
+            appBuffer = httpResponseVO.getAppBuffer(sslEngine.getSession().getApplicationBufferSize());
+            packetBuffer = httpResponseVO.getPacketBuffer(sslEngine.getSession().getPacketBufferSize());
         }
         Integer chunkedNum = Optional.of(httpResponseVO.getChunked()).filter(c -> c.contains("\r")).map(c -> Integer.parseInt(c.substring(0, c.indexOf("\r")), 16)).orElse(null);
         while ((num = socketChannel.read(packetBuffer)) != 0) {
             if (sslEngine != null) {
                 packetBuffer.flip();
                 SSLEngineResult res = sslEngine.unwrap(packetBuffer, appBuffer);
-                isUnwrap = res.getStatus() != SSLEngineResult.Status.BUFFER_UNDERFLOW;
+                isUnwrap = res.getStatus() == SSLEngineResult.Status.OK;
                 packetBuffer.compact();
             } else {
                 appBuffer = packetBuffer;
