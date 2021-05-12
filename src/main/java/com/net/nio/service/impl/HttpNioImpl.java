@@ -86,13 +86,13 @@ public class HttpNioImpl extends NioAbstract {
         }
         Integer chunkedNum = Optional.of(httpResponseVO.getChunked()).filter(c -> c.contains("\r")).map(c -> Integer.parseInt(c.substring(0, c.indexOf("\r")), 16)).orElse(null);
         while ((num = socketChannel.read(packetBuffer)) != 0) {
-            if (sslEngine != null) {
+            if (sslEngine == null) {
+                appBuffer = packetBuffer;
+            } else {
                 packetBuffer.flip();
                 SSLEngineResult res = sslEngine.unwrap(packetBuffer, appBuffer);
                 isUnwrap = res.getStatus() == SSLEngineResult.Status.OK;
                 packetBuffer.compact();
-            } else {
-                appBuffer = packetBuffer;
             }
 
             for (int i = 0; i < appBuffer.position() && isUnwrap; i++) {
