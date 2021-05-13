@@ -25,7 +25,7 @@ import java.util.stream.IntStream;
  */
 @Slf4j
 public class NetNioApplication {
-    public static LocalDateTime start = LocalDateTime.now();
+
 
     public static void main(String[] args) throws InterruptedException {
         ExecutorService threadPool = new ThreadPoolExecutor(50,
@@ -33,24 +33,22 @@ public class NetNioApplication {
                 0L,
                 TimeUnit.MILLISECONDS,
                 new LinkedBlockingQueue<Runnable>());
-
         SslService sslService = new SslServiceImpl();
         HttpService httpService = new HttpServiceImpl(sslService, threadPool);
         IntStream.range(0, 1).forEach(i -> {
-
-            httpService.doGet("https://www.bilibili.com/video/BV1cz4y1o7vk?from=search&seid=3912482160943577015", httpResponseVO -> {
+            LocalDateTime start = LocalDateTime.now();
+            httpService.doGet("https://www.bilibili.com/video/BV1w64y11787?from=search&seid=5135759427111210711", httpResponseVO -> {
                 System.out.println(new String(httpResponseVO.getOriginHeader()));
-                String res = new String(httpResponseVO.getBody());
-                System.out.println(res);
-                System.out.println(Duration.between(start, LocalDateTime.now()).toMillis());
+                System.out.println(new String(httpResponseVO.getBody()));
+                System.out.println("用时：" + Duration.between(start, LocalDateTime.now()).toMillis());
             }, new LinkedHashMap() {{
                 /*put("Accept-Encoding", "gzip, deflate");*/
                 put("cookie", "_uuid=ED61076A-4384-3871-77CF-1D5DAC79E25F20193infoc; buvid3=A1F3EA2A-EEF0-4B9B-AD9C-5B92AEEAC7BE18553infoc; CURRENT_FNVAL=80; blackside_state=1; rpdid=|(u~|~~km~)R0J'uYuR~RlJll; buvid_fp=A1F3EA2A-EEF0-4B9B-AD9C-5B92AEEAC7BE18553infoc; buvid_fp_plain=328CBAF9-0B0F-4ED8-8F1B-AE9C1CA827F718564infoc; fingerprint=7a8d81b2349aee547658234afb8661fa; PVID=1; bsource=search_baidu; sid=b58ekf8m; CURRENT_QUALITY=0");
             }});
         });
-        Thread.sleep(2000);
+        /*Thread.sleep(2000);
         ((NioAbstract) httpService).stopNioMonitor();
-        threadPool.shutdownNow();
+        threadPool.shutdownNow();*/
 
     }
 
