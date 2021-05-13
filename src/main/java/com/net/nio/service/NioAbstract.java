@@ -60,11 +60,11 @@ public abstract class NioAbstract {
                     if (selectionKey.isWritable()) {
                         selectionKey.interestOps(0);
                         HttpRequestVO httpRequestVO = (HttpRequestVO) selectionKey.attachment();
-                        threadPool.submit(exchangeRunnable(() -> writeHandler(selectionKey), httpRequestVO.getExceptionHandler(), () -> selectionKey.cancel()));
+                        threadPool.submit(exchangeRunnable(() -> writeHandler(selectionKey), httpRequestVO.getExceptionHandler(), selectionKey::cancel));
                     } else if (selectionKey.isReadable()) {
                         selectionKey.interestOps(0);
                         HttpResponseVO httpResponseVO = (HttpResponseVO) selectionKey.attachment();
-                        threadPool.submit(exchangeRunnable(() -> readHandler(selectionKey), httpResponseVO.getExceptionHandler(), () -> selectionKey.cancel()));
+                        threadPool.submit(exchangeRunnable(() -> readHandler(selectionKey), httpResponseVO.getExceptionHandler(), selectionKey::cancel));
                     }
                 }
             } catch (Exception e) {
