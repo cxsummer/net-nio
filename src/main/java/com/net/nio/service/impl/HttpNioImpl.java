@@ -47,7 +47,9 @@ public class HttpNioImpl extends NioAbstract {
         while (socketChannel.write(byteBuffer) > 0) {
             Thread.yield();
         }
-        if (!byteBuffer.hasRemaining()) {
+        if (byteBuffer.hasRemaining()) {
+            selectionKey.interestOps(SelectionKey.OP_WRITE);
+        } else {
             HttpResponseVO httpResponseVO = new HttpResponseVO();
             httpResponseVO.setChunked("");
             httpResponseVO.setBodyIndex(0);
@@ -59,8 +61,6 @@ public class HttpNioImpl extends NioAbstract {
             httpResponseVO.setExceptionHandler(httpRequestVO.getExceptionHandler());
             selectionKey.attach(httpResponseVO);
             selectionKey.interestOps(SelectionKey.OP_READ);
-        } else {
-            selectionKey.interestOps(SelectionKey.OP_WRITE);
         }
     }
 
