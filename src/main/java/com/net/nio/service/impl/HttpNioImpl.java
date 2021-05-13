@@ -1,5 +1,6 @@
 package com.net.nio.service.impl;
 
+import com.net.nio.NetNioApplication;
 import com.net.nio.model.HttpRequestVO;
 import com.net.nio.model.HttpResponseVO;
 import com.net.nio.service.NioAbstract;
@@ -13,6 +14,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
@@ -42,6 +45,7 @@ public class HttpNioImpl extends NioAbstract {
         HttpRequestVO httpRequestVO = (HttpRequestVO) selectionKey.attachment();
         ByteBuffer byteBuffer = requestByteBuffer(httpRequestVO, socketChannel);
         while (socketChannel.write(byteBuffer) > 0) {
+            Thread.yield();
         }
         if (!byteBuffer.hasRemaining()) {
             HttpResponseVO httpResponseVO = new HttpResponseVO();
@@ -70,7 +74,6 @@ public class HttpNioImpl extends NioAbstract {
     @Override
     protected void readHandler(SelectionKey selectionKey) throws IOException {
         int num;
-        boolean isUnwrap = true;
         ByteBuffer packetBuffer;
         ByteBuffer appBuffer = null;
         Integer contentLength = null;
@@ -89,13 +92,14 @@ public class HttpNioImpl extends NioAbstract {
             if (sslEngine == null) {
                 appBuffer = packetBuffer;
             } else {
+                SSLEngineResult res;
                 packetBuffer.flip();
-                SSLEngineResult res = sslEngine.unwrap(packetBuffer, appBuffer);
-                isUnwrap = res.getStatus() == SSLEngineResult.Status.OK;
+                do {
+                    res = sslEngine.unwrap(packetBuffer, appBuffer);
+                } while (res.getStatus() == SSLEngineResult.Status.OK);
                 packetBuffer.compact();
             }
-
-            for (int i = 0; i < appBuffer.position() && isUnwrap; i++) {
+            for (int i = 0; i < appBuffer.position(); i++) {
                 byte b = appBuffer.get(i);
                 byte[] body = httpResponseVO.getBody();
                 if (httpResponseVO.getHeaderIndex() > -1) {
@@ -108,14 +112,14 @@ public class HttpNioImpl extends NioAbstract {
                         body = body.length > 0 ? body : httpResponseVO.setGetBody(new byte[contentLength]);
                         body[httpResponseVO.getIncrementBodyIndex()] = b;
                         if (httpResponseVO.getBodyIndex().equals(contentLength)) {
-                            num = -1;
+                            num = -2;
                             break;
                         }
                     } else if ("chunked".equals(transferEncoding)) {
                         String chunked = httpResponseVO.getChunked();
                         if (chunked.endsWith("\r\n")) {
                             if (chunkedNum == 0) {
-                                num = -1;
+                                num = -2;
                                 break;
                             }
                             body[httpResponseVO.getIncrementBodyIndex()] = b;
@@ -133,7 +137,7 @@ public class HttpNioImpl extends NioAbstract {
                     }
                 }
             }
-            if (num == -1) {
+            if (num < 0) {
                 socketChannel.close();
                 contentDecode(httpResponseVO);
                 httpResponseVO.getCallBack().accept(httpResponseVO);

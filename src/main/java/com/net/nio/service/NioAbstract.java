@@ -1,5 +1,6 @@
 package com.net.nio.service;
 
+import com.net.nio.NetNioApplication;
 import com.net.nio.model.HttpRequestVO;
 import com.net.nio.model.HttpResponseVO;
 import lombok.extern.slf4j.Slf4j;
@@ -7,6 +8,8 @@ import lombok.extern.slf4j.Slf4j;
 import java.io.IOException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.Iterator;
 import java.util.concurrent.ExecutorService;
 
@@ -47,6 +50,7 @@ public abstract class NioAbstract {
         while (!nioMonitorThread.isInterrupted()) {
             try {
                 if (selector.selectNow() <= 0) {
+                    Thread.yield();
                     continue;
                 }
                 Iterator<SelectionKey> iterator = selector.selectedKeys().iterator();
