@@ -1,6 +1,7 @@
 package com.net.nio.utils;
 
 import java.util.Arrays;
+import java.util.Optional;
 import java.util.stream.IntStream;
 
 /**
@@ -17,9 +18,11 @@ public class DataUtil {
      * @return
      */
     public static byte[] byteExpansion(byte[] origin, int num) {
-        byte[] temp = new byte[origin.length + num];
-        IntStream.range(0, origin.length).forEach(i -> temp[i] = origin[i]);
-        return temp;
+        return Optional.ofNullable(origin).map(o -> {
+            byte[] temp = new byte[o.length + num];
+            IntStream.range(0, o.length).forEach(i -> temp[i] = o[i]);
+            return temp;
+        }).orElseGet(() -> new byte[num]);
     }
 
     /**

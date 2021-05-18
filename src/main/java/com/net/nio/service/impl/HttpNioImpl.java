@@ -51,10 +51,10 @@ public class HttpNioImpl extends NioAbstract {
             selectionKey.interestOps(SelectionKey.OP_WRITE);
         } else {
             HttpResponseVO httpResponseVO = new HttpResponseVO();
+            httpResponseVO.setBody(null);
             httpResponseVO.setChunked("");
             httpResponseVO.setBodyIndex(0);
             httpResponseVO.setHeaderIndex(0);
-            httpResponseVO.setBody(new byte[0]);
             httpResponseVO.setOriginHeader(new byte[1024]);
             httpResponseVO.setCallBack(httpRequestVO.getCallBack());
             httpResponseVO.setSslEngine(httpRequestVO.getSslEngine());
