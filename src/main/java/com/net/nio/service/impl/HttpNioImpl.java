@@ -109,7 +109,7 @@ public class HttpNioImpl extends NioAbstract {
                     transferEncoding = Optional.ofNullable(transferEncoding).orElseGet(() -> Optional.ofNullable(headers.get("Transfer-Encoding")).map(c -> c.get(0)).orElse(""));
                     contentLength = Optional.ofNullable(contentLength).orElseGet(() -> Optional.ofNullable(headers.get("Content-Length")).map(c -> Integer.parseInt(c.get(0))).orElse(-1));
                     if (contentLength != -1) {
-                        body = body.length > 0 ? body : httpResponseVO.setGetBody(new byte[contentLength]);
+                        body = body != null ? body : httpResponseVO.setGetBody(new byte[contentLength]);
                         body[httpResponseVO.getIncrementBodyIndex()] = b;
                         if (httpResponseVO.getBodyIndex().equals(contentLength)) {
                             num = -2;
