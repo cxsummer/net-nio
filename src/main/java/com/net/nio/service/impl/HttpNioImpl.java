@@ -151,6 +151,7 @@ public class HttpNioImpl extends NioAbstract {
 
     /**
      * 将请求转为http请求数组
+     * todo headers里面的Transfer-Encoding为chunked时要按照格式分割报文体
      *
      * @param httpRequestVO
      * @return
@@ -160,7 +161,7 @@ public class HttpNioImpl extends NioAbstract {
             try {
                 Map<String, Object> headers = Optional.ofNullable(httpRequestVO.getHeaders()).orElseGet(LinkedHashMap::new);
                 headers.put("HOST", headers.getOrDefault("HOST", httpRequestVO.getHost()));
-
+                headers.put("Content-Length", Optional.ofNullable(httpRequestVO.getBody()).map(b -> b.length).orElse(0));
                 String requestLine = httpRequestVO.getMethod() + " " + httpRequestVO.getPath() + " HTTP/1.1 \r\n";
                 byte[] request = headers.entrySet().stream().map(e -> e.getKey() + ":" + e.getValue()).collect(Collectors.joining("\r\n", requestLine, "\r\n\r\n")).getBytes("UTF-8");
                 ByteBuffer item = ByteBuffer.wrap(Optional.ofNullable(httpRequestVO.getBody()).map(b -> byteConcat(request, b)).orElse(request));
