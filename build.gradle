@@ -30,8 +30,6 @@ shadowJar {
 }
 
 dependencies {
-    implementation 'com.alibaba:fastjson:1.2.75'
-
     compile 'org.slf4j:slf4j-simple:1.8.0-beta0'
     implementation 'org.slf4j:slf4j-api:1.8.0-beta2'
     implementation 'org.projectlombok:lombok:1.18.12'
