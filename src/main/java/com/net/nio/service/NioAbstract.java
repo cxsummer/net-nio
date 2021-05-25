@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.io.IOException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
+import java.nio.channels.SocketChannel;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Iterator;
@@ -57,7 +58,11 @@ public abstract class NioAbstract {
                 while (iterator.hasNext()) {
                     SelectionKey selectionKey = iterator.next();
                     iterator.remove();
-                    if (selectionKey.isWritable()) {
+                    if (selectionKey.isConnectable()) {
+                        selectionKey.interestOps(0);
+                        HttpRequestVO httpRequestVO = (HttpRequestVO) selectionKey.attachment();
+                        threadPool.submit(exchangeRunnable(() -> connectHandler(selectionKey), httpRequestVO.getExceptionHandler(), selectionKey::cancel));
+                    } else if (selectionKey.isWritable()) {
                         selectionKey.interestOps(0);
                         HttpRequestVO httpRequestVO = (HttpRequestVO) selectionKey.attachment();
                         threadPool.submit(exchangeRunnable(() -> writeHandler(selectionKey), httpRequestVO.getExceptionHandler(), selectionKey::cancel));
@@ -81,6 +86,14 @@ public abstract class NioAbstract {
     public void stopNioMonitor() {
         nioMonitorThread.interrupt();
     }
+
+    /**
+     * 连接操作
+     *
+     * @param selectionKey
+     * @throws IOException
+     */
+    protected abstract void connectHandler(SelectionKey selectionKey) throws IOException;
 
     /**
      * 写操作

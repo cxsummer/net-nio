@@ -67,9 +67,10 @@ public class HttpServiceImpl extends HttpNioImpl implements HttpService {
             httpRequestVO.setExceptionHandler(exceptionHandler);
             Optional.ofNullable(headers).filter(h -> h.length > 0).map(h -> h[0]).ifPresent(httpRequestVO::setHeaders);
 
-            SocketChannel socketChannel = SocketChannel.open(new InetSocketAddress(host, port));
+            SocketChannel socketChannel = SocketChannel.open();
             socketChannel.configureBlocking(false);
-            socketChannel.register(selector, SelectionKey.OP_WRITE, httpRequestVO);
+            socketChannel.connect(new InetSocketAddress(host, port));
+            socketChannel.register(selector, SelectionKey.OP_CONNECT, httpRequestVO);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

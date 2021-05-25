@@ -40,6 +40,14 @@ public class HttpNioImpl extends NioAbstract {
     }
 
     @Override
+    protected void connectHandler(SelectionKey selectionKey) throws IOException {
+        SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
+        if (socketChannel.finishConnect()) {
+            selectionKey.interestOps(SelectionKey.OP_WRITE);
+        }
+    }
+
+    @Override
     protected void writeHandler(SelectionKey selectionKey) throws IOException {
         SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
         HttpRequestVO httpRequestVO = (HttpRequestVO) selectionKey.attachment();
