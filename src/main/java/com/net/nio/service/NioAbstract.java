@@ -1,20 +1,29 @@
 package com.net.nio.service;
 
 import com.net.nio.NetNioApplication;
+import com.net.nio.model.BaseNetVO;
 import com.net.nio.model.HttpRequestVO;
 import com.net.nio.model.HttpResponseVO;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.concurrent.ExecutorService;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import static com.net.nio.service.RunnableTe.exchangeRunnable;
+import static com.net.nio.service.SelectionHandler.forEachHandler;
 
 /**
  * @author caojiancheng
@@ -26,6 +35,7 @@ public abstract class NioAbstract {
 
     protected Selector selector;
     private Thread nioMonitorThread;
+    private Method getExceptionHandler;
     protected ExecutorService threadPool;
 
     public NioAbstract(ExecutorService threadPool) {
@@ -33,7 +43,8 @@ public abstract class NioAbstract {
             this.threadPool = threadPool;
             this.selector = Selector.open();
             threadPool.submit(this::startNioMonitor);
-        } catch (IOException e) {
+            getExceptionHandler = BaseNetVO.class.getMethod("getExceptionHandler");
+        } catch (IOException | NoSuchMethodException e) {
             throw new RuntimeException(e);
         }
     }
@@ -58,19 +69,9 @@ public abstract class NioAbstract {
                 while (iterator.hasNext()) {
                     SelectionKey selectionKey = iterator.next();
                     iterator.remove();
-                    if (selectionKey.isConnectable()) {
-                        selectionKey.interestOps(0);
-                        HttpRequestVO httpRequestVO = (HttpRequestVO) selectionKey.attachment();
-                        threadPool.submit(exchangeRunnable(() -> connectHandler(selectionKey), httpRequestVO.getExceptionHandler(), selectionKey::cancel));
-                    } else if (selectionKey.isWritable()) {
-                        selectionKey.interestOps(0);
-                        HttpRequestVO httpRequestVO = (HttpRequestVO) selectionKey.attachment();
-                        threadPool.submit(exchangeRunnable(() -> writeHandler(selectionKey), httpRequestVO.getExceptionHandler(), selectionKey::cancel));
-                    } else if (selectionKey.isReadable()) {
-                        selectionKey.interestOps(0);
-                        HttpResponseVO httpResponseVO = (HttpResponseVO) selectionKey.attachment();
-                        threadPool.submit(exchangeRunnable(() -> readHandler(selectionKey), httpResponseVO.getExceptionHandler(), selectionKey::cancel));
-                    }
+                    selectionKey.interestOps(0);
+                    Consumer<Exception> exceptionHandler = (Consumer<Exception>) getExceptionHandler.invoke(selectionKey.attachment());
+                    forEachHandler(selectionKey, s -> threadPool.submit(exchangeRunnable(() -> s.getBiConsumerTe().accept(this, selectionKey), exceptionHandler, selectionKey::cancel)));
                 }
             } catch (Exception e) {
                 e.printStackTrace();
@@ -110,4 +111,21 @@ public abstract class NioAbstract {
      * @throws IOException
      */
     protected abstract void readHandler(SelectionKey selectionKey) throws IOException;
+
+}
+
+
+@Getter
+@AllArgsConstructor
+enum SelectionHandler {
+    readable(SelectionKey::isReadable, NioAbstract::readHandler),
+    writable(SelectionKey::isWritable, NioAbstract::writeHandler),
+    connectable(SelectionKey::isConnectable, NioAbstract::connectHandler);
+
+    private Predicate<SelectionKey> predicate;
+    private BiConsumerTe<NioAbstract, SelectionKey> biConsumerTe;
+
+    public static void forEachHandler(SelectionKey selectionKey, Consumer<SelectionHandler> action) {
+        Arrays.stream(SelectionHandler.values()).filter(s -> s.getPredicate().test(selectionKey)).forEach(action);
+    }
 }

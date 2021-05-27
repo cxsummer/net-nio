@@ -1,6 +1,7 @@
 package com.net.nio.model;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 import javax.net.ssl.SSLEngine;
 import java.nio.ByteBuffer;
@@ -17,7 +18,8 @@ import java.util.function.Supplier;
  * @description
  */
 @Data
-public class HttpResponseVO {
+@EqualsAndHashCode(callSuper = false)
+public class HttpResponseVO extends BaseNetVO {
 
     /**
      * 协议
@@ -74,16 +76,6 @@ public class HttpResponseVO {
      * 分段在body的原始位置
      */
     private Integer chunkedInitIndex;
-
-    /**
-     * 回调方法
-     */
-    Consumer<HttpResponseVO> callBack;
-
-    /**
-     * 异常处理
-     */
-    Consumer<Exception> exceptionHandler;
 
     /**
      * ssl引擎

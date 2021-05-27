@@ -1,6 +1,7 @@
 package com.net.nio.model;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
@@ -15,7 +16,8 @@ import java.util.function.Consumer;
  * @description
  */
 @Data
-public class HttpRequestVO {
+@EqualsAndHashCode(callSuper = false)
+public class HttpRequestVO extends BaseNetVO {
 
     /**
      * 请求端口
@@ -52,15 +54,6 @@ public class HttpRequestVO {
      */
     private byte[] body;
 
-    /**
-     * 回调方法
-     */
-    Consumer<HttpResponseVO> callBack;
-
-    /**
-     * 异常处理
-     */
-    Consumer<Exception> exceptionHandler;
 
     /**
      * 写入的ByteBuffer
