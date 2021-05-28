@@ -1,5 +1,7 @@
 package com.net.nio.service;
 
+import com.net.nio.utils.Assert;
+
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -21,36 +23,18 @@ public interface RunnableTe {
      * RunnableTe转Runnable
      *
      * @param runnableTe
-     * @param function
+     * @param consumers  如果有多个异常处理，自行执行consumer的andThen方法
      * @return
      */
-    static Runnable exchangeRunnable(RunnableTe runnableTe, Function<Exception, ?>... function) {
+    static Runnable exchangeRunnable(RunnableTe runnableTe, Consumer<Exception>... consumers) {
+        Assert.isTrue(consumers.length < 2, "consumers最多只能有1个");
         return () -> {
             try {
                 runnableTe.run();
             } catch (Exception e) {
-                if (function.length > 0) {
-                    function[0].apply(e);
+                if (consumers.length > 0) {
+                    consumers[0].accept(e);
                 }
-            }
-        };
-    }
-
-    /**
-     * RunnableTe转Runnable
-     *
-     * @param runnableTe   真正处理逻辑
-     * @param consumers    异常处理
-     * @param preException 异常前置处理
-     * @return
-     */
-    static Runnable exchangeRunnable(RunnableTe runnableTe, Consumer<Exception> consumers, Runnable preException) {
-        return () -> {
-            try {
-                runnableTe.run();
-            } catch (Exception e) {
-                preException.run();
-                consumers.accept(e);
             }
         };
     }

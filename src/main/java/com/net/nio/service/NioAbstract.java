@@ -18,11 +18,11 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-import static com.net.nio.service.RunnableTe.exchangeRunnable;
 import static com.net.nio.service.SelectionHandler.forEachHandler;
 
 /**
@@ -70,8 +70,7 @@ public abstract class NioAbstract {
                     SelectionKey selectionKey = iterator.next();
                     iterator.remove();
                     selectionKey.interestOps(0);
-                    Consumer<Exception> exceptionHandler = (Consumer<Exception>) getExceptionHandler.invoke(selectionKey.attachment());
-                    forEachHandler(selectionKey, s -> threadPool.submit(exchangeRunnable(() -> s.getBiConsumerTe().accept(this, selectionKey), exceptionHandler, selectionKey::cancel)));
+                    forEachHandler(this, selectionKey, (Consumer<Exception>) getExceptionHandler.invoke(selectionKey.attachment()), threadPool);
                 }
             } catch (Exception e) {
                 e.printStackTrace();
@@ -125,7 +124,14 @@ enum SelectionHandler {
     private Predicate<SelectionKey> predicate;
     private BiConsumerTe<NioAbstract, SelectionKey> biConsumerTe;
 
-    public static void forEachHandler(SelectionKey selectionKey, Consumer<SelectionHandler> action) {
-        Arrays.stream(SelectionHandler.values()).filter(s -> s.getPredicate().test(selectionKey)).forEach(action);
+    public static void forEachHandler(NioAbstract nioAbstract, SelectionKey selectionKey, Consumer<Exception> exceptionHandler, ExecutorService threadPool) {
+        Arrays.stream(SelectionHandler.values()).filter(s -> s.getPredicate().test(selectionKey)).forEach(s -> threadPool.submit(() -> {
+            try {
+                s.getBiConsumerTe().accept(nioAbstract, selectionKey);
+            } catch (Exception e) {
+                selectionKey.cancel();
+                exceptionHandler.accept(e);
+            }
+        }));
     }
 }
