@@ -69,8 +69,7 @@ public abstract class NioAbstract {
                 while (iterator.hasNext()) {
                     SelectionKey selectionKey = iterator.next();
                     iterator.remove();
-                    selectionKey.interestOps(0);
-                    forEachHandler(this, selectionKey, (Consumer<Exception>) getExceptionHandler.invoke(selectionKey.attachment()), threadPool);
+                    forEachHandler(this, selectionKey, (Consumer<Exception>) getExceptionHandler.invoke(selectionKey.attachment()));
                 }
             } catch (Exception e) {
                 e.printStackTrace();
@@ -113,25 +112,28 @@ public abstract class NioAbstract {
 
 }
 
-
+/**
+ * 为防止java.nio.channels.CancelledKeyException错误
+ * 要按照SelectionKey的isConnectable，isWritable，isReadable的顺序执行
+ */
 @Getter
 @AllArgsConstructor
 enum SelectionHandler {
-    readable(SelectionKey::isReadable, NioAbstract::readHandler),
+    connectable(SelectionKey::isConnectable, NioAbstract::connectHandler),
     writable(SelectionKey::isWritable, NioAbstract::writeHandler),
-    connectable(SelectionKey::isConnectable, NioAbstract::connectHandler);
+    readable(SelectionKey::isReadable, NioAbstract::readHandler);
 
     private Predicate<SelectionKey> predicate;
     private BiConsumerTe<NioAbstract, SelectionKey> biConsumerTe;
 
-    public static void forEachHandler(NioAbstract nioAbstract, SelectionKey selectionKey, Consumer<Exception> exceptionHandler, ExecutorService threadPool) {
-        Arrays.stream(SelectionHandler.values()).filter(s -> s.getPredicate().test(selectionKey)).forEach(s -> threadPool.submit(() -> {
+    public static void forEachHandler(NioAbstract nioAbstract, SelectionKey selectionKey, Consumer<Exception> exceptionHandler) {
+        Arrays.stream(SelectionHandler.values()).filter(s -> s.getPredicate().test(selectionKey)).forEach(s -> {
             try {
                 s.getBiConsumerTe().accept(nioAbstract, selectionKey);
             } catch (Exception e) {
                 selectionKey.cancel();
                 exceptionHandler.accept(e);
             }
-        }));
+        });
     }
 }

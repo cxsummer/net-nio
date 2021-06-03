@@ -55,9 +55,7 @@ public class HttpNioImpl extends NioAbstract {
         while (socketChannel.write(byteBuffer) > 0) {
             Thread.yield();
         }
-        if (byteBuffer.hasRemaining()) {
-            selectionKey.interestOps(SelectionKey.OP_WRITE);
-        } else {
+        if (!byteBuffer.hasRemaining()) {
             HttpResponseVO httpResponseVO = new HttpResponseVO();
             httpResponseVO.setBody(null);
             httpResponseVO.setChunked("");
@@ -148,12 +146,11 @@ public class HttpNioImpl extends NioAbstract {
             if (num < 0) {
                 socketChannel.close();
                 contentDecode(httpResponseVO);
-                httpResponseVO.getCallBack().accept(httpResponseVO);
+                threadPool.submit(() -> httpResponseVO.getCallBack().accept(httpResponseVO));
                 return;
             }
             appBuffer.clear();
         }
-        selectionKey.interestOps(SelectionKey.OP_READ);
     }
 
 
