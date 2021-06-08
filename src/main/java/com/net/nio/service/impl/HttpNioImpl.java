@@ -11,6 +11,7 @@ import com.net.nio.utils.GzipUtil;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
@@ -150,7 +151,17 @@ public class HttpNioImpl extends NioAbstract {
                 }
             }
             if (num < 0) {
-                socketChannel.close();
+                synchronized (requestList) {
+                    if (requestList.size() > 0) {
+                        HttpRequestVO httpRequestVO = (HttpRequestVO) requestList.get(0)[0];
+                        InetSocketAddress inetSocketAddress = (InetSocketAddress) requestList.get(0)[1];
+                        requestList.remove(0);
+                        httpRequestVO.setSslEngine(sslEngine);
+                        socketChannel.register(selector, SelectionKey.OP_WRITE, httpRequestVO);
+                    }else{
+                        socketChannel.close();
+                    }
+                }
                 contentDecode(httpResponseVO);
                 httpResponseVO.getCallBack().accept(httpResponseVO);
                 return;
