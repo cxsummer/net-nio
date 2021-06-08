@@ -33,6 +33,8 @@ public class HttpNioImpl extends NioAbstract {
     private SslService sslService;
     protected final String HTTP = "http";
     protected final String HTTPS = "https";
+    protected Integer activeChannel = 0;
+    protected final List<Object[]> requestList = new LinkedList();
 
     public HttpNioImpl(SslService sslService, ExecutorService threadPool) {
         super(threadPool);
