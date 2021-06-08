@@ -44,6 +44,8 @@ public class HttpNioImpl extends NioAbstract {
         SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
         if (socketChannel.finishConnect()) {
             selectionKey.interestOps(SelectionKey.OP_WRITE);
+        } else {
+            selectionKey.interestOps(SelectionKey.OP_CONNECT);
         }
     }
 
@@ -55,7 +57,9 @@ public class HttpNioImpl extends NioAbstract {
         while (socketChannel.write(byteBuffer) > 0) {
             Thread.yield();
         }
-        if (!byteBuffer.hasRemaining()) {
+        if (byteBuffer.hasRemaining()) {
+            selectionKey.interestOps(SelectionKey.OP_WRITE);
+        } else {
             HttpResponseVO httpResponseVO = new HttpResponseVO();
             httpResponseVO.setBody(null);
             httpResponseVO.setChunked("");
@@ -146,11 +150,12 @@ public class HttpNioImpl extends NioAbstract {
             if (num < 0) {
                 socketChannel.close();
                 contentDecode(httpResponseVO);
-                threadPool.submit(() -> httpResponseVO.getCallBack().accept(httpResponseVO));
+                httpResponseVO.getCallBack().accept(httpResponseVO);
                 return;
             }
             appBuffer.clear();
         }
+        selectionKey.interestOps(SelectionKey.OP_READ);
     }
 
 
@@ -172,7 +177,7 @@ public class HttpNioImpl extends NioAbstract {
                 ByteBuffer item = ByteBuffer.wrap(Optional.ofNullable(httpRequestVO.getBody()).map(b -> byteConcat(request, b)).orElse(request));
                 if (HTTPS.equalsIgnoreCase(httpRequestVO.getProtocol())) {
                     SSLEngine sslEngine = sslService.initSslEngine(httpRequestVO.getHost(), httpRequestVO.getPort());
-                    sslService.sslHandshake(sslEngine, socketChannel, threadPool);
+                    sslService.sslHandshake(sslEngine, socketChannel);
                     ByteBuffer packetBuffer = ByteBuffer.allocate(sslEngine.getSession().getPacketBufferSize());
                     SSLEngineResult res = sslEngine.wrap(item, packetBuffer);
                     Assert.isTrue(res.getStatus() == SSLEngineResult.Status.OK, "SSL握手失败");

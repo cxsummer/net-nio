@@ -50,10 +50,9 @@ public interface SslService {
      *
      * @param sslEngine
      * @param socketChannel
-     * @param threadPool
      * @throws Exception
      */
-    default void sslHandshake(SSLEngine sslEngine, SocketChannel socketChannel, ExecutorService threadPool) throws Exception {
+    default void sslHandshake(SSLEngine sslEngine, SocketChannel socketChannel) throws Exception {
         sslEngine.beginHandshake();
         SSLSession sslSession = sslEngine.getSession();
         SSLEngineResult.HandshakeStatus handshakeStatus = sslEngine.getHandshakeStatus();
@@ -86,7 +85,7 @@ public interface SslService {
                 case NEED_TASK:
                     Runnable task;
                     while ((task = sslEngine.getDelegatedTask()) != null) {
-                        threadPool.submit(task);
+                        task.run();
                     }
                     handshakeStatus = sslEngine.getHandshakeStatus();
                     break;
