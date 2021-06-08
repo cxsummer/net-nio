@@ -131,7 +131,6 @@ enum SelectionHandler {
             try {
                 s.getBiConsumerTe().accept(nioAbstract, selectionKey);
             } catch (Exception e) {
-                selectionKey.cancel();
                 exceptionHandler.accept(e);
             }
         });

@@ -11,6 +11,7 @@ import com.net.nio.utils.GzipUtil;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
@@ -33,6 +34,8 @@ public class HttpNioImpl extends NioAbstract {
     private SslService sslService;
     protected final String HTTP = "http";
     protected final String HTTPS = "https";
+    protected Integer activeChannel = 0;
+    protected final List<Object[]> requestList = new LinkedList();
 
     public HttpNioImpl(SslService sslService, ExecutorService threadPool) {
         super(threadPool);
@@ -144,7 +147,17 @@ public class HttpNioImpl extends NioAbstract {
                 }
             }
             if (num < 0) {
-                socketChannel.close();
+                synchronized (requestList) {
+                    if (requestList.size() > 0) {
+                        HttpRequestVO httpRequestVO = (HttpRequestVO) requestList.get(0)[0];
+                        InetSocketAddress inetSocketAddress = (InetSocketAddress) requestList.get(0)[1];
+                        requestList.remove(0);
+                        httpRequestVO.setSslEngine(sslEngine);
+                        socketChannel.register(selector, SelectionKey.OP_WRITE, httpRequestVO);
+                    }else{
+                        socketChannel.close();
+                    }
+                }
                 contentDecode(httpResponseVO);
                 threadPool.submit(() -> httpResponseVO.getCallBack().accept(httpResponseVO));
                 return;
@@ -171,8 +184,11 @@ public class HttpNioImpl extends NioAbstract {
                 byte[] request = headers.entrySet().stream().map(e -> e.getKey() + ":" + e.getValue()).collect(Collectors.joining("\r\n", requestLine, "\r\n\r\n")).getBytes("UTF-8");
                 ByteBuffer item = ByteBuffer.wrap(Optional.ofNullable(httpRequestVO.getBody()).map(b -> byteConcat(request, b)).orElse(request));
                 if (HTTPS.equalsIgnoreCase(httpRequestVO.getProtocol())) {
-                    SSLEngine sslEngine = sslService.initSslEngine(httpRequestVO.getHost(), httpRequestVO.getPort());
-                    sslService.sslHandshake(sslEngine, socketChannel, threadPool);
+                    SSLEngine sslEngine=httpRequestVO.getSslEngine();
+                    if(sslEngine==null){
+                        sslEngine = sslService.initSslEngine(httpRequestVO.getHost(), httpRequestVO.getPort());
+                        sslService.sslHandshake(sslEngine, socketChannel, threadPool);
+                    }
                     ByteBuffer packetBuffer = ByteBuffer.allocate(sslEngine.getSession().getPacketBufferSize());
                     SSLEngineResult res = sslEngine.wrap(item, packetBuffer);
                     Assert.isTrue(res.getStatus() == SSLEngineResult.Status.OK, "SSL握手失败");
