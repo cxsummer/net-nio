@@ -158,7 +158,7 @@ public class HttpNioImpl extends NioAbstract {
                         requestList.remove(0);
                         httpRequestVO.setSslEngine(sslEngine);
                         socketChannel.register(selector, SelectionKey.OP_WRITE, httpRequestVO);
-                    }else{
+                    } else {
                         socketChannel.close();
                     }
                 }
@@ -189,8 +189,11 @@ public class HttpNioImpl extends NioAbstract {
                 byte[] request = headers.entrySet().stream().map(e -> e.getKey() + ":" + e.getValue()).collect(Collectors.joining("\r\n", requestLine, "\r\n\r\n")).getBytes("UTF-8");
                 ByteBuffer item = ByteBuffer.wrap(Optional.ofNullable(httpRequestVO.getBody()).map(b -> byteConcat(request, b)).orElse(request));
                 if (HTTPS.equalsIgnoreCase(httpRequestVO.getProtocol())) {
-                    SSLEngine sslEngine = sslService.initSslEngine(httpRequestVO.getHost(), httpRequestVO.getPort());
-                    sslService.sslHandshake(sslEngine, socketChannel);
+                    SSLEngine sslEngine = httpRequestVO.getSslEngine();
+                    if (sslEngine == null) {
+                        sslEngine = sslService.initSslEngine(httpRequestVO.getHost(), httpRequestVO.getPort());
+                        sslService.sslHandshake(sslEngine, socketChannel);
+                    }
                     ByteBuffer packetBuffer = ByteBuffer.allocate(sslEngine.getSession().getPacketBufferSize());
                     SSLEngineResult res = sslEngine.wrap(item, packetBuffer);
                     Assert.isTrue(res.getStatus() == SSLEngineResult.Status.OK, "SSL握手失败");
