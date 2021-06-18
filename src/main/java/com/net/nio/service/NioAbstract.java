@@ -69,7 +69,6 @@ public abstract class NioAbstract {
                 while (iterator.hasNext()) {
                     SelectionKey selectionKey = iterator.next();
                     iterator.remove();
-                    selectionKey.interestOps(0);
                     forEachHandler(this, selectionKey, (Consumer<Exception>) getExceptionHandler.invoke(selectionKey.attachment()), threadPool);
                 }
             } catch (Exception e) {
@@ -128,11 +127,10 @@ enum SelectionHandler {
     private BiConsumerTe<NioAbstract, SelectionKey> biConsumerTe;
 
     public static void forEachHandler(NioAbstract nioAbstract, SelectionKey selectionKey, Consumer<Exception> exceptionHandler, ExecutorService threadPool) {
-        Arrays.stream(SelectionHandler.values()).filter(s -> s.getPredicate().test(selectionKey)).forEach(s -> threadPool.submit(() -> {
+        Arrays.stream(SelectionHandler.values()).filter(s -> s.getPredicate().test(selectionKey)).peek(s -> selectionKey.interestOps(0)).forEach(s -> threadPool.submit(() -> {
             try {
                 s.getBiConsumerTe().accept(nioAbstract, selectionKey);
             } catch (Exception e) {
-                selectionKey.cancel();
                 exceptionHandler.accept(e);
             }
         }));

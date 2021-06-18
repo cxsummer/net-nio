@@ -4,6 +4,7 @@ import com.net.nio.NetNioApplication;
 import com.net.nio.model.HttpRequestVO;
 import com.net.nio.model.HttpResponseVO;
 import com.net.nio.service.NioAbstract;
+import com.net.nio.service.SocketChannelPool;
 import com.net.nio.service.SslService;
 import com.net.nio.utils.Assert;
 import com.net.nio.utils.GzipUtil;
@@ -19,6 +20,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static com.net.nio.utils.DataUtil.byteConcat;
@@ -34,12 +36,12 @@ public class HttpNioImpl extends NioAbstract {
     private SslService sslService;
     protected final String HTTP = "http";
     protected final String HTTPS = "https";
-    protected Integer activeChannel = 0;
-    protected final List<Object[]> requestList = new LinkedList();
+    protected SocketChannelPool socketChannelPool;
 
     public HttpNioImpl(SslService sslService, ExecutorService threadPool) {
         super(threadPool);
         this.sslService = sslService;
+        this.socketChannelPool = new SocketChannelPoolImpl(50, selector);
     }
 
     @Override
@@ -151,17 +153,8 @@ public class HttpNioImpl extends NioAbstract {
                 }
             }
             if (num < 0) {
-                synchronized (requestList) {
-                    if (requestList.size() > 0) {
-                        HttpRequestVO httpRequestVO = (HttpRequestVO) requestList.get(0)[0];
-                        InetSocketAddress inetSocketAddress = (InetSocketAddress) requestList.get(0)[1];
-                        requestList.remove(0);
-                        httpRequestVO.setSslEngine(sslEngine);
-                        socketChannel.register(selector, SelectionKey.OP_WRITE, httpRequestVO);
-                    } else {
-                        socketChannel.close();
-                    }
-                }
+                Consumer<HttpRequestVO> consumer = c -> c.setSslEngine(sslEngine);
+                socketChannelPool.close(selectionKey, consumer);
                 contentDecode(httpResponseVO);
                 httpResponseVO.getCallBack().accept(httpResponseVO);
                 return;

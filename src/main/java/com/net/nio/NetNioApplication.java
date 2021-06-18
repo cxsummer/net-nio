@@ -36,6 +36,7 @@ public class NetNioApplication {
                 0L,
                 TimeUnit.MILLISECONDS,
                 new LinkedBlockingQueue<Runnable>());
+
         List<String> list=new ArrayList(){{
             add("https://ts.yashenggd.com/20210530/EStaCgCR/1000kb/hls/xI0InLWq.ts");
             add("https://ts.yashenggd.com/20210530/EStaCgCR/1000kb/hls/AJpwi7ah.ts");

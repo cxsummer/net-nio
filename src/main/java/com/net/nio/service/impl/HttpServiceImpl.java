@@ -2,6 +2,7 @@ package com.net.nio.service.impl;
 
 import com.net.nio.model.HttpRequestVO;
 import com.net.nio.model.HttpResponseVO;
+import com.net.nio.model.NioAddressVO;
 import com.net.nio.service.HttpService;
 import com.net.nio.service.SslService;
 import com.net.nio.utils.Assert;
@@ -67,15 +68,11 @@ public class HttpServiceImpl extends HttpNioImpl implements HttpService {
             httpRequestVO.setExceptionHandler(exceptionHandler);
             Optional.ofNullable(headers).filter(h -> h.length > 0).map(h -> h[0]).ifPresent(httpRequestVO::setHeaders);
 
-            if (activeChannel < 60) {
-                SocketChannel socketChannel = SocketChannel.open();
-                socketChannel.configureBlocking(false);
-                socketChannel.connect(new InetSocketAddress(host, port));
-                socketChannel.register(selector, SelectionKey.OP_CONNECT, httpRequestVO);
-                activeChannel++;
-            } else {
-                requestList.add(new Object[]{httpRequestVO, new InetSocketAddress(host, port)});
-            }
+            NioAddressVO address = new NioAddressVO();
+            address.setPort(port);
+            address.setHost(host);
+            address.setAtt(httpRequestVO);
+            socketChannelPool.submit(address);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
