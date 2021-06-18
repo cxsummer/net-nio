@@ -41,7 +41,7 @@ public class HttpNioImpl extends NioAbstract {
     public HttpNioImpl(SslService sslService, ExecutorService threadPool) {
         super(threadPool);
         this.sslService = sslService;
-        this.socketChannelPool = new SocketChannelPoolImpl(50, selector);
+        this.socketChannelPool = new SocketChannelPoolImpl(2, selector);
     }
 
     @Override
@@ -186,12 +186,12 @@ public class HttpNioImpl extends NioAbstract {
                     if (sslEngine == null) {
                         sslEngine = sslService.initSslEngine(httpRequestVO.getHost(), httpRequestVO.getPort());
                         sslService.sslHandshake(sslEngine, socketChannel);
+                        httpRequestVO.setSslEngine(sslEngine);
                     }
                     ByteBuffer packetBuffer = ByteBuffer.allocate(sslEngine.getSession().getPacketBufferSize());
                     SSLEngineResult res = sslEngine.wrap(item, packetBuffer);
                     Assert.isTrue(res.getStatus() == SSLEngineResult.Status.OK, "SSL握手失败");
                     packetBuffer.flip();
-                    httpRequestVO.setSslEngine(sslEngine);
                     item = packetBuffer;
                 }
                 httpRequestVO.setByteBuffer(item);
