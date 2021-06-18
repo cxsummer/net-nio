@@ -27,10 +27,10 @@ public interface SocketChannelPool {
     /**
      * 返还给连接池
      *
-     * @param selectionKey 连接
+     * @param socketChannel 连接
      * @param attConsumer
      * @return
      * @throws IOException
      */
-    void close(SelectionKey selectionKey, Consumer attConsumer) throws IOException;
+    void close(SocketChannel socketChannel, Consumer attConsumer) throws IOException;
 }

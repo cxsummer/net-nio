@@ -41,7 +41,7 @@ public class HttpNioImpl extends NioAbstract {
     public HttpNioImpl(SslService sslService, ExecutorService threadPool) {
         super(threadPool);
         this.sslService = sslService;
-        this.socketChannelPool = new SocketChannelPoolImpl(2, selector);
+        this.socketChannelPool = new SocketChannelPoolImpl(50, selector);
     }
 
     @Override
@@ -154,7 +154,7 @@ public class HttpNioImpl extends NioAbstract {
             }
             if (num < 0) {
                 Consumer<HttpRequestVO> consumer = c -> c.setSslEngine(sslEngine);
-                socketChannelPool.close(selectionKey, consumer);
+                socketChannelPool.close(socketChannel, consumer);
                 contentDecode(httpResponseVO);
                 httpResponseVO.getCallBack().accept(httpResponseVO);
                 return;
@@ -183,7 +183,7 @@ public class HttpNioImpl extends NioAbstract {
                 ByteBuffer item = ByteBuffer.wrap(Optional.ofNullable(httpRequestVO.getBody()).map(b -> byteConcat(request, b)).orElse(request));
                 if (HTTPS.equalsIgnoreCase(httpRequestVO.getProtocol())) {
                     SSLEngine sslEngine = httpRequestVO.getSslEngine();
-                    if (sslEngine == null) {
+                    if (sslEngine == null || sslEngine.isInboundDone() || sslEngine.isOutboundDone()) {
                         sslEngine = sslService.initSslEngine(httpRequestVO.getHost(), httpRequestVO.getPort());
                         sslService.sslHandshake(sslEngine, socketChannel);
                         httpRequestVO.setSslEngine(sslEngine);

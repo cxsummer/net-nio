@@ -6,6 +6,7 @@ import lombok.Data;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -47,8 +48,8 @@ public class SocketChannelPoolImpl implements SocketChannelPool {
                 if (channel.getFree() == 1) {
                     if (channel.isValid() && key.equals(e.getKey())) {
                         try {
-                            channel.setFree((byte) 0);
-                            channel.getSelectionKey().channel().register(selector, SelectionKey.OP_WRITE, att);
+                            channel.setFree(0);
+                            channel.getSocketChannel().register(selector, SelectionKey.OP_WRITE, att);
                             return true;
                         } catch (ClosedChannelException closedChannelException) {
                             closedChannelException.printStackTrace();
@@ -76,18 +77,19 @@ public class SocketChannelPoolImpl implements SocketChannelPool {
             socketChannel.configureBlocking(false);
             socketChannel.connect(new InetSocketAddress(host, port));
             Channel channelPoolItem = Optional.ofNullable(minChannel).filter(a -> activeSize == poolSize).orElseGet(Channel::new);
-            channelPoolItem.setFree((byte) 0);
+            channelPoolItem.setFree(0);
             channelPoolItem.setAddTime(System.currentTimeMillis());
-            channelPoolItem.setSelectionKey(socketChannel.register(selector, SelectionKey.OP_CONNECT, att));
+            channelPoolItem.setSocketChannel(socketChannel);
             channelList.add(channelPoolItem);
+            socketChannel.register(selector, SelectionKey.OP_CONNECT, att);
         } else {
             addressList.add(address);
         }
     }
 
     @Override
-    public synchronized void close(SelectionKey selectionKey, Consumer attConsumer) throws IOException {
-        pool.values().stream().filter(Objects::nonNull).flatMap(Collection::stream).filter(c -> c.getSelectionKey() == selectionKey).findFirst().get().setFree((byte) 1);
+    public synchronized void close(SocketChannel socketChannel, Consumer attConsumer) throws IOException {
+        pool.values().stream().filter(Objects::nonNull).flatMap(Collection::stream).filter(c -> c.getSocketChannel() == socketChannel).findFirst().get().setFree(1);
         if (addressList.size() > 0) {
             NioAddressVO address = addressList.get(0);
             attConsumer.accept(address.getAtt());
@@ -101,7 +103,7 @@ public class SocketChannelPoolImpl implements SocketChannelPool {
         /**
          * 是否空闲0：否，1是
          */
-        private byte free;
+        private int free;
 
         /**
          * 添加时间
@@ -111,10 +113,16 @@ public class SocketChannelPoolImpl implements SocketChannelPool {
         /**
          * 连接通道
          */
-        private SelectionKey selectionKey;
+        private SocketChannel socketChannel;
 
         public boolean isValid() {
-            return selectionKey.isValid();
+            try {
+                ByteBuffer b = ByteBuffer.allocate(1);
+                return socketChannel.read(b) == -1 ? false : true;
+            } catch (IOException e) {
+                e.printStackTrace();
+                return false;
+            }
         }
     }
 }
