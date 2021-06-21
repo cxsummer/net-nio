@@ -68,11 +68,12 @@ public class SocketChannelPoolImpl<T> implements SocketChannelPool<T> {
             SocketChannel socketChannel = SocketChannel.open();
             socketChannel.configureBlocking(false);
             socketChannel.connect(new InetSocketAddress(host, port));
-            Channel channelPoolItem = Optional.ofNullable(minChannel).filter(a -> activeSize == poolSize).orElseGet(Channel::new);
-            channelPoolItem.setFree(0);
-            channelPoolItem.setAddTime(System.currentTimeMillis());
-            channelPoolItem.setSocketChannel(socketChannel);
-            channelList.add(channelPoolItem);
+            Channel channel = Optional.ofNullable(minChannel).filter(a -> activeSize == poolSize).orElseGet(Channel::new);
+            channel.setFree(0);
+            channel.setAttConsumer(null);
+            channel.setSocketChannel(socketChannel);
+            channel.setAddTime(System.currentTimeMillis());
+            channelList.add(channel);
             socketChannel.register(selector, SelectionKey.OP_CONNECT, att);
             System.out.println("创建连接");
         } else {
