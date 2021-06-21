@@ -14,7 +14,7 @@ import java.util.function.Supplier;
  * @date 2021/6/9
  * @description
  */
-public interface SocketChannelPool {
+public interface SocketChannelPool<T> {
     /**
      * 从连接池中拿连接
      *
@@ -32,5 +32,5 @@ public interface SocketChannelPool {
      * @return
      * @throws IOException
      */
-    void close(SocketChannel socketChannel, Consumer attConsumer) throws IOException;
+    void close(SocketChannel socketChannel, Consumer<T> attConsumer) throws IOException;
 }

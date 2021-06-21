@@ -12,7 +12,6 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
@@ -21,7 +20,7 @@ import java.util.stream.Stream;
  * @date 2021/6/9
  * @description
  */
-public class SocketChannelPoolImpl implements SocketChannelPool {
+public class SocketChannelPoolImpl<T> implements SocketChannelPool<T> {
     private int poolSize;
     private Selector selector;
     private List<NioAddressVO> addressList;
@@ -36,37 +35,30 @@ public class SocketChannelPoolImpl implements SocketChannelPool {
 
     @Override
     public synchronized void submit(NioAddressVO address) throws IOException {
+        Channel minChannel = null;
         int port = address.getPort();
         Object att = address.getAtt();
         String host = address.getHost();
         String key = host + ":" + port;
-        AtomicReference<Channel> minChannelReference = new AtomicReference<>();
-        boolean findSameChanel = pool.entrySet().stream().filter(e -> e.getValue() != null).anyMatch(e -> {
-            Iterator<Channel> iterator = e.getValue().iterator();
-            while (iterator.hasNext()) {
-                Channel channel = iterator.next();
+        for (Map.Entry<String, List<Channel>> entry : pool.entrySet()) {
+            for (Channel channel : entry.getValue()) {
                 if (channel.getFree() == 1) {
-                    if (channel.isValid() && key.equals(e.getKey())) {
+                    if (channel.isValid() && key.equals(entry.getKey())) {
                         try {
                             channel.setFree(0);
+                            channel.getAttConsumer().accept(att);
                             channel.getSocketChannel().register(selector, SelectionKey.OP_WRITE, att);
-                            return true;
+                            return;
                         } catch (ClosedChannelException closedChannelException) {
                             closedChannelException.printStackTrace();
                         }
                     } else {
-                        Channel minChannel = minChannelReference.get();
-                        minChannelReference.set(minChannel == null ? channel : Stream.of(minChannel, channel).min(Comparator.comparingLong(Channel::getAddTime)).get());
+                        minChannel = minChannel == null ? channel : Stream.of(minChannel, channel).min(Comparator.comparingLong(Channel::getAddTime)).get();
                     }
                 }
             }
-            return false;
-        });
-        if (findSameChanel) {
-            return;
         }
         List<Channel> channelList = pool.get(key);
-        Channel minChannel = minChannelReference.get();
         int activeSize = pool.values().stream().filter(Objects::nonNull).mapToInt(List::size).sum();
         if (activeSize < poolSize || minChannel != null) {
             if (channelList == null) {
@@ -82,17 +74,19 @@ public class SocketChannelPoolImpl implements SocketChannelPool {
             channelPoolItem.setSocketChannel(socketChannel);
             channelList.add(channelPoolItem);
             socketChannel.register(selector, SelectionKey.OP_CONNECT, att);
+            System.out.println("创建连接");
         } else {
             addressList.add(address);
         }
     }
 
     @Override
-    public synchronized void close(SocketChannel socketChannel, Consumer attConsumer) throws IOException {
-        pool.values().stream().filter(Objects::nonNull).flatMap(Collection::stream).filter(c -> c.getSocketChannel() == socketChannel).findFirst().get().setFree(1);
+    public synchronized void close(SocketChannel socketChannel, Consumer<T> attConsumer) throws IOException {
+        Channel channel = pool.values().stream().filter(Objects::nonNull).flatMap(Collection::stream).filter(c -> c.getSocketChannel() == socketChannel).findFirst().get();
+        channel.setFree(1);
+        channel.setAttConsumer(attConsumer);
         if (addressList.size() > 0) {
             NioAddressVO address = addressList.get(0);
-            attConsumer.accept(address.getAtt());
             submit(address);
             addressList.remove(0);
         }
@@ -111,6 +105,11 @@ public class SocketChannelPoolImpl implements SocketChannelPool {
         private long addTime;
 
         /**
+         * 处理附加数据
+         */
+        Consumer attConsumer;
+
+        /**
          * 连接通道
          */
         private SocketChannel socketChannel;
@@ -120,7 +119,6 @@ public class SocketChannelPoolImpl implements SocketChannelPool {
                 ByteBuffer b = ByteBuffer.allocate(1);
                 return socketChannel.read(b) == -1 ? false : true;
             } catch (IOException e) {
-                e.printStackTrace();
                 return false;
             }
         }

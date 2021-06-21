@@ -1,6 +1,5 @@
 package com.net.nio.service.impl;
 
-import com.net.nio.NetNioApplication;
 import com.net.nio.model.HttpRequestVO;
 import com.net.nio.model.HttpResponseVO;
 import com.net.nio.service.NioAbstract;
@@ -12,15 +11,11 @@ import com.net.nio.utils.GzipUtil;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
-import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static com.net.nio.utils.DataUtil.byteConcat;
@@ -36,12 +31,12 @@ public class HttpNioImpl extends NioAbstract {
     private SslService sslService;
     protected final String HTTP = "http";
     protected final String HTTPS = "https";
-    protected SocketChannelPool socketChannelPool;
+    protected SocketChannelPool<HttpRequestVO> socketChannelPool;
 
     public HttpNioImpl(SslService sslService, ExecutorService threadPool) {
         super(threadPool);
         this.sslService = sslService;
-        this.socketChannelPool = new SocketChannelPoolImpl(50, selector);
+        this.socketChannelPool = new SocketChannelPoolImpl(1, selector);
     }
 
     @Override
@@ -66,7 +61,6 @@ public class HttpNioImpl extends NioAbstract {
             selectionKey.interestOps(SelectionKey.OP_WRITE);
         } else {
             HttpResponseVO httpResponseVO = new HttpResponseVO();
-            httpResponseVO.setBody(null);
             httpResponseVO.setChunked("");
             httpResponseVO.setBodyIndex(0);
             httpResponseVO.setHeaderIndex(0);
@@ -153,8 +147,7 @@ public class HttpNioImpl extends NioAbstract {
                 }
             }
             if (num < 0) {
-                Consumer<HttpRequestVO> consumer = c -> c.setSslEngine(sslEngine);
-                socketChannelPool.close(socketChannel, consumer);
+                socketChannelPool.close(socketChannel, c -> c.setSslEngine(sslEngine));
                 contentDecode(httpResponseVO);
                 httpResponseVO.getCallBack().accept(httpResponseVO);
                 return;
