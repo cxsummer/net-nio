@@ -33,4 +33,12 @@ public interface SocketChannelPool<T> {
      * @throws IOException
      */
     void close(SocketChannel socketChannel, Consumer<T> attConsumer) throws IOException;
+
+    /**
+     * 获取通道使用次数
+     *
+     * @param socketChannel
+     * @return
+     */
+    int channelTime(SocketChannel socketChannel);
 }

@@ -47,6 +47,7 @@ public class SocketChannelPoolImpl<T> implements SocketChannelPool<T> {
                         try {
                             channel.setFree(0);
                             channel.getAttConsumer().accept(att);
+                            channel.setTimes(channel.getTimes() + 1);
                             channel.getSocketChannel().register(selector, SelectionKey.OP_WRITE, att);
                             return;
                         } catch (ClosedChannelException closedChannelException) {
@@ -70,6 +71,7 @@ public class SocketChannelPoolImpl<T> implements SocketChannelPool<T> {
             socketChannel.connect(new InetSocketAddress(host, port));
             Channel channel = Optional.ofNullable(minChannel).filter(a -> activeSize == poolSize).orElseGet(Channel::new);
             channel.setFree(0);
+            channel.setTimes(0);
             channel.setAttConsumer(null);
             channel.setSocketChannel(socketChannel);
             channel.setAddTime(System.currentTimeMillis());
@@ -93,12 +95,22 @@ public class SocketChannelPoolImpl<T> implements SocketChannelPool<T> {
         }
     }
 
+    @Override
+    public int channelTime(SocketChannel socketChannel) {
+        return pool.values().stream().filter(Objects::nonNull).flatMap(Collection::stream).filter(c -> c.getSocketChannel() == socketChannel).findFirst().get().getTimes();
+    }
+
     @Data
     private class Channel {
         /**
          * 是否空闲0：否，1是
          */
         private int free;
+
+        /**
+         * 使用次数
+         */
+        private int times;
 
         /**
          * 添加时间

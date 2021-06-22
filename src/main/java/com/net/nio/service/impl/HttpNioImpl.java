@@ -2,6 +2,7 @@ package com.net.nio.service.impl;
 
 import com.net.nio.model.HttpRequestVO;
 import com.net.nio.model.HttpResponseVO;
+import com.net.nio.model.NioAddressVO;
 import com.net.nio.service.NioAbstract;
 import com.net.nio.service.SocketChannelPool;
 import com.net.nio.service.SslService;
@@ -65,8 +66,8 @@ public class HttpNioImpl extends NioAbstract {
             httpResponseVO.setBodyIndex(0);
             httpResponseVO.setHeaderIndex(0);
             httpResponseVO.setOriginHeader(new byte[1024]);
+            httpResponseVO.setHttpRequestVO(httpRequestVO);
             httpResponseVO.setCallBack(httpRequestVO.getCallBack());
-            httpResponseVO.setSslEngine(httpRequestVO.getSslEngine());
             httpResponseVO.setExceptionHandler(httpRequestVO.getExceptionHandler());
             selectionKey.attach(httpResponseVO);
             selectionKey.interestOps(SelectionKey.OP_READ);
@@ -89,7 +90,7 @@ public class HttpNioImpl extends NioAbstract {
         String transferEncoding = null;
         SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
         HttpResponseVO httpResponseVO = (HttpResponseVO) selectionKey.attachment();
-        SSLEngine sslEngine = httpResponseVO.getSslEngine();
+        SSLEngine sslEngine = httpResponseVO.getHttpRequestVO().getSslEngine();
         if (sslEngine == null) {
             packetBuffer = httpResponseVO.getPacketBuffer(10 * 1024);
         } else {
@@ -148,8 +149,18 @@ public class HttpNioImpl extends NioAbstract {
             }
             if (num < 0) {
                 socketChannelPool.close(socketChannel, c -> c.setSslEngine(sslEngine));
-                contentDecode(httpResponseVO);
-                httpResponseVO.getCallBack().accept(httpResponseVO);
+                if (httpResponseVO.getHeaders() == null) {
+                    Assert.isTrue(socketChannelPool.channelTime(socketChannel) > 0, "服务器断开连接：" + num);
+                    HttpRequestVO httpRequestVO = httpResponseVO.getHttpRequestVO();
+                    NioAddressVO address = new NioAddressVO();
+                    address.setAtt(httpRequestVO);
+                    address.setPort(httpRequestVO.getPort());
+                    address.setHost(httpRequestVO.getHost());
+                    socketChannelPool.submit(address);
+                } else {
+                    contentDecode(httpResponseVO);
+                    httpResponseVO.getCallBack().accept(httpResponseVO);
+                }
                 return;
             }
             appBuffer.clear();

@@ -78,20 +78,19 @@ public class HttpResponseVO extends BaseNetVO {
     private Integer chunkedInitIndex;
 
     /**
-     * ssl引擎
-     */
-    private SSLEngine sslEngine;
-
-
-    /**
      * 应用数据包
      */
-    ByteBuffer appBuffer;
+    private ByteBuffer appBuffer;
 
     /**
      * 报文数据包
      */
-    ByteBuffer packetBuffer;
+    private ByteBuffer packetBuffer;
+
+    /**
+     * 原始http发送报文
+     */
+    private HttpRequestVO httpRequestVO;
 
     public byte[] setGetBody(byte[] body) {
         this.body = body;
