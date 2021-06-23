@@ -1,5 +1,6 @@
 package com.net.nio.service.impl;
 
+import com.net.nio.exception.CallBackException;
 import com.net.nio.model.HttpRequestVO;
 import com.net.nio.model.HttpResponseVO;
 import com.net.nio.model.NioAddressVO;
@@ -80,6 +81,7 @@ public class HttpNioImpl extends NioAbstract {
      * 如果Transfer-Encoding等于chunked，那么报文体是分段返回的，从head（第一个\r\n\r\n）后开始，每一段的开始是  当前段长度（16进制）\r\n 结束是 \r\n 中间的字节就是段内容，其字节数等于当前段长度
      * 关闭socketChannel，当再次执行selector.select()时，会将此socketChannel从selector中移除，所以读取完毕后需要执行socketChannel.close()
      * 当调用SelectionKey的cancel()方法或关闭与SelectionKey关联的Channel或与SelectionKey关联的Selector被关闭。SelectionKey对象会失效，意味着Selector再也不会监控与它相关的事件
+     * 但SelectionKey的cancel()并不会关闭连接，只是Selector再也不会监控与它相关的事件
      */
     @Override
     protected void readHandler(SelectionKey selectionKey) throws IOException {
@@ -148,18 +150,19 @@ public class HttpNioImpl extends NioAbstract {
                 }
             }
             if (num < 0) {
+                int times = socketChannelPool.channelTimes(socketChannel);
                 socketChannelPool.close(socketChannel, c -> c.setSslEngine(sslEngine));
-                if (httpResponseVO.getHeaders() == null) {
-                    Assert.isTrue(socketChannelPool.channelTime(socketChannel) > 0, "服务器断开连接：" + num);
+                if (httpResponseVO.getHeaders() != null) {
+                    contentDecode(httpResponseVO);
+                    doCallBack(httpResponseVO);
+                } else {
+                    Assert.isTrue(times > 0, "服务器断开连接：" + num);
                     HttpRequestVO httpRequestVO = httpResponseVO.getHttpRequestVO();
                     NioAddressVO address = new NioAddressVO();
                     address.setAtt(httpRequestVO);
                     address.setPort(httpRequestVO.getPort());
                     address.setHost(httpRequestVO.getHost());
                     socketChannelPool.submit(address);
-                } else {
-                    contentDecode(httpResponseVO);
-                    httpResponseVO.getCallBack().accept(httpResponseVO);
                 }
                 return;
             }
@@ -168,6 +171,13 @@ public class HttpNioImpl extends NioAbstract {
         selectionKey.interestOps(SelectionKey.OP_READ);
     }
 
+    private void doCallBack(HttpResponseVO httpResponseVO) {
+        try {
+            httpResponseVO.getCallBack().accept(httpResponseVO);
+        } catch (Exception e) {
+            throw new CallBackException(e);
+        }
+    }
 
     /**
      * 将请求转为http请求数组
@@ -176,9 +186,9 @@ public class HttpNioImpl extends NioAbstract {
      * @param httpRequestVO
      * @return
      */
-    private ByteBuffer requestByteBuffer(HttpRequestVO httpRequestVO, SocketChannel socketChannel) {
-        return Optional.ofNullable(httpRequestVO.getByteBuffer()).orElseGet(() -> {
-            try {
+    private ByteBuffer requestByteBuffer(HttpRequestVO httpRequestVO, SocketChannel socketChannel) throws IOException {
+        try {
+            if (httpRequestVO.getByteBuffer() == null) {
                 Map<String, Object> headers = Optional.ofNullable(httpRequestVO.getHeaders()).orElseGet(LinkedHashMap::new);
                 headers.put("HOST", headers.getOrDefault("HOST", httpRequestVO.getHost()));
                 headers.put("Content-Length", Optional.ofNullable(httpRequestVO.getBody()).map(b -> b.length).orElse(0));
@@ -199,11 +209,11 @@ public class HttpNioImpl extends NioAbstract {
                     item = packetBuffer;
                 }
                 httpRequestVO.setByteBuffer(item);
-                return item;
-            } catch (Exception e) {
-                throw new RuntimeException(e);
             }
-        });
+            return httpRequestVO.getByteBuffer();
+        } catch (Exception e) {
+            throw new IOException(e);
+        }
     }
 
     /**

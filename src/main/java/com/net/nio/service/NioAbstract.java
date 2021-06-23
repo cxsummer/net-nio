@@ -1,6 +1,7 @@
 package com.net.nio.service;
 
 import com.net.nio.NetNioApplication;
+import com.net.nio.exception.CallBackException;
 import com.net.nio.model.BaseNetVO;
 import com.net.nio.model.HttpRequestVO;
 import com.net.nio.model.HttpResponseVO;
@@ -10,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
@@ -87,6 +89,17 @@ public abstract class NioAbstract {
     }
 
     /**
+     * 关闭连接
+     */
+    public void closeChannel(SelectableChannel channel) {
+        try {
+            channel.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
      * 连接操作
      *
      * @param selectionKey
@@ -115,6 +128,8 @@ public abstract class NioAbstract {
 /**
  * 为防止java.nio.channels.CancelledKeyException错误
  * 要按照SelectionKey的isConnectable，isWritable，isReadable的顺序执行
+ * 如果出现IOException就说明是网络io出现的问题，需要作废连接
+ * 因为已经将calback函数的报错包装成CallBackException类型，他的报错不需要作废连接,想获取回调函数的原始报错可通过e.getCause()获取
  */
 @Getter
 @AllArgsConstructor
@@ -130,9 +145,13 @@ enum SelectionHandler {
         Arrays.stream(SelectionHandler.values()).filter(s -> s.getPredicate().test(selectionKey)).peek(s -> selectionKey.interestOps(0)).forEach(s -> threadPool.submit(() -> {
             try {
                 s.getBiConsumerTe().accept(nioAbstract, selectionKey);
+            } catch (IOException e) {
+                nioAbstract.closeChannel(selectionKey.channel());
+                exceptionHandler.accept(e);
             } catch (Exception e) {
                 exceptionHandler.accept(e);
             }
         }));
     }
+
 }

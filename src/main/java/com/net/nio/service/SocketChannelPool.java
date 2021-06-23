@@ -40,5 +40,5 @@ public interface SocketChannelPool<T> {
      * @param socketChannel
      * @return
      */
-    int channelTime(SocketChannel socketChannel);
+    int channelTimes(SocketChannel socketChannel);
 }

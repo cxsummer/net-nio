@@ -61,6 +61,7 @@ public class SocketChannelPoolImpl<T> implements SocketChannelPool<T> {
         }
         List<Channel> channelList = pool.get(key);
         int activeSize = pool.values().stream().filter(Objects::nonNull).mapToInt(List::size).sum();
+        System.out.println("活跃的数量" + activeSize);
         if (activeSize < poolSize || minChannel != null) {
             if (channelList == null) {
                 channelList = new ArrayList();
@@ -69,13 +70,15 @@ public class SocketChannelPoolImpl<T> implements SocketChannelPool<T> {
             SocketChannel socketChannel = SocketChannel.open();
             socketChannel.configureBlocking(false);
             socketChannel.connect(new InetSocketAddress(host, port));
-            Channel channel = Optional.ofNullable(minChannel).filter(a -> activeSize == poolSize).orElseGet(Channel::new);
-            channel.setFree(0);
-            channel.setTimes(0);
-            channel.setAttConsumer(null);
-            channel.setSocketChannel(socketChannel);
-            channel.setAddTime(System.currentTimeMillis());
-            channelList.add(channel);
+            if (activeSize < poolSize) {
+                minChannel = new Channel();
+                channelList.add(minChannel);
+            }
+            minChannel.setFree(0);
+            minChannel.setTimes(0);
+            minChannel.setAttConsumer(null);
+            minChannel.setSocketChannel(socketChannel);
+            minChannel.setAddTime(System.currentTimeMillis());
             socketChannel.register(selector, SelectionKey.OP_CONNECT, att);
             System.out.println("创建连接");
         } else {
@@ -85,7 +88,7 @@ public class SocketChannelPoolImpl<T> implements SocketChannelPool<T> {
 
     @Override
     public synchronized void close(SocketChannel socketChannel, Consumer<T> attConsumer) throws IOException {
-        Channel channel = pool.values().stream().filter(Objects::nonNull).flatMap(Collection::stream).filter(c -> c.getSocketChannel() == socketChannel).findFirst().get();
+        Channel channel = getChannelFromSocket(socketChannel);
         channel.setFree(1);
         channel.setAttConsumer(attConsumer);
         if (addressList.size() > 0) {
@@ -95,9 +98,14 @@ public class SocketChannelPoolImpl<T> implements SocketChannelPool<T> {
         }
     }
 
+
     @Override
-    public int channelTime(SocketChannel socketChannel) {
-        return pool.values().stream().filter(Objects::nonNull).flatMap(Collection::stream).filter(c -> c.getSocketChannel() == socketChannel).findFirst().get().getTimes();
+    public int channelTimes(SocketChannel socketChannel) {
+        return getChannelFromSocket(socketChannel).getTimes();
+    }
+
+    private Channel getChannelFromSocket(SocketChannel socketChannel) {
+        return pool.values().stream().filter(Objects::nonNull).flatMap(Collection::stream).filter(c -> c.getSocketChannel() == socketChannel).findFirst().get();
     }
 
     @Data
@@ -127,10 +135,13 @@ public class SocketChannelPoolImpl<T> implements SocketChannelPool<T> {
          */
         private SocketChannel socketChannel;
 
+        /**
+         * 双方都没有关闭代表可用
+         */
         public boolean isValid() {
             try {
                 ByteBuffer b = ByteBuffer.allocate(1);
-                return socketChannel.read(b) == -1 ? false : true;
+                return socketChannel.isOpen() && socketChannel.read(b) > -1 ? true : false;
             } catch (IOException e) {
                 return false;
             }
