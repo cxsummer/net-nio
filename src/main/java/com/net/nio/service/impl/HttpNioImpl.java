@@ -33,7 +33,7 @@ public class HttpNioImpl extends NioAbstract {
     private SslService sslService;
     protected final String HTTP = "http";
     protected final String HTTPS = "https";
-    protected SocketChannelPool<HttpRequestVO> socketChannelPool;
+    protected SocketChannelPool socketChannelPool;
 
     public HttpNioImpl(SslService sslService, ExecutorService threadPool) {
         super(threadPool);
@@ -150,7 +150,7 @@ public class HttpNioImpl extends NioAbstract {
             }
             if (num < 0) {
                 Assert.isIoTrue(httpResponseVO.getHeaders() != null, "服务器断开连接：" + num);
-                socketChannelPool.close(socketChannel, c -> c.setSslEngine(sslEngine));
+                socketChannelPool.close(socketChannel);
                 contentDecode(httpResponseVO);
                 doCallBack(httpResponseVO);
                 return;
@@ -166,8 +166,8 @@ public class HttpNioImpl extends NioAbstract {
         if (e instanceof IOException) {
             closeChannel(socketChannel);
         }
-        int times = socketChannelPool.channelTimes(socketChannel);
-        socketChannelPool.close(socketChannel, null);
+        int times = socketChannelPool.getChannelFromSocket(socketChannel).getTimes();
+        socketChannelPool.close(socketChannel);
         Assert.isTrue(times > 0, "服务器断开连接");
         Object att = selectionKey.attachment();
         HttpRequestVO httpRequestVO = att instanceof HttpResponseVO ? ((HttpResponseVO) att).getHttpRequestVO() : ((HttpRequestVO) att);
@@ -207,9 +207,11 @@ public class HttpNioImpl extends NioAbstract {
                 if (HTTPS.equalsIgnoreCase(httpRequestVO.getProtocol())) {
                     SSLEngine sslEngine = httpRequestVO.getSslEngine();
                     if (sslEngine == null || sslEngine.isInboundDone() || sslEngine.isOutboundDone()) {
+                        SocketChannelPool.Channel<HttpRequestVO> channel = socketChannelPool.getChannelFromSocket(socketChannel);
                         sslEngine = sslService.initSslEngine(httpRequestVO.getHost(), httpRequestVO.getPort());
                         sslService.sslHandshake(sslEngine, socketChannel);
                         httpRequestVO.setSslEngine(sslEngine);
+                        channel.setAttConsumer(c -> c.setSslEngine(httpRequestVO.getSslEngine()));
                     }
                     ByteBuffer packetBuffer = ByteBuffer.allocate(sslEngine.getSession().getPacketBufferSize());
                     SSLEngineResult res = sslEngine.wrap(item, packetBuffer);

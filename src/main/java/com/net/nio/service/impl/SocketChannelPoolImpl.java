@@ -20,11 +20,13 @@ import java.util.stream.Stream;
  * @date 2021/6/9
  * @description
  */
-public class SocketChannelPoolImpl<T> implements SocketChannelPool<T> {
+public class SocketChannelPoolImpl<T> implements SocketChannelPool {
     private int poolSize;
     private Selector selector;
     private List<NioAddressVO> addressList;
     private Map<String, List<Channel>> pool;
+    private Consumer emptyConsumer = c -> {
+    };
 
     public SocketChannelPoolImpl(int poolSize, Selector selector) {
         this.poolSize = poolSize;
@@ -76,7 +78,7 @@ public class SocketChannelPoolImpl<T> implements SocketChannelPool<T> {
             }
             minChannel.setFree(0);
             minChannel.setTimes(0);
-            minChannel.setAttConsumer(null);
+            minChannel.setAttConsumer(emptyConsumer);
             minChannel.setSocketChannel(socketChannel);
             minChannel.setAddTime(System.currentTimeMillis());
             socketChannel.register(selector, SelectionKey.OP_CONNECT, att);
@@ -87,10 +89,9 @@ public class SocketChannelPoolImpl<T> implements SocketChannelPool<T> {
     }
 
     @Override
-    public synchronized void close(SocketChannel socketChannel, Consumer<T> attConsumer) throws IOException {
+    public synchronized void close(SocketChannel socketChannel) throws IOException {
         Channel channel = getChannelFromSocket(socketChannel);
         channel.setFree(1);
-        Optional.ofNullable(attConsumer).ifPresent(c -> channel.setAttConsumer(c));
         if (addressList.size() > 0) {
             NioAddressVO address = addressList.get(0);
             submit(address);
@@ -98,53 +99,9 @@ public class SocketChannelPoolImpl<T> implements SocketChannelPool<T> {
         }
     }
 
-
     @Override
-    public int channelTimes(SocketChannel socketChannel) {
-        return getChannelFromSocket(socketChannel).getTimes();
-    }
-
-    private Channel getChannelFromSocket(SocketChannel socketChannel) {
+    public Channel getChannelFromSocket(SocketChannel socketChannel) {
         return pool.values().stream().filter(Objects::nonNull).flatMap(Collection::stream).filter(c -> c.getSocketChannel() == socketChannel).findFirst().get();
     }
 
-    @Data
-    private class Channel {
-        /**
-         * 是否空闲0：否，1是
-         */
-        private int free;
-
-        /**
-         * 使用次数
-         */
-        private int times;
-
-        /**
-         * 添加时间
-         */
-        private long addTime;
-
-        /**
-         * 处理附加数据
-         */
-        Consumer attConsumer;
-
-        /**
-         * 连接通道
-         */
-        private SocketChannel socketChannel;
-
-        /**
-         * 双方都没有关闭代表可用
-         */
-        public boolean isValid() {
-            try {
-                ByteBuffer b = ByteBuffer.allocate(1);
-                return socketChannel.isOpen() && socketChannel.read(b) > -1 ? true : false;
-            } catch (IOException e) {
-                return false;
-            }
-        }
-    }
 }

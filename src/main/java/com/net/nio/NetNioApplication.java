@@ -863,7 +863,7 @@ public class NetNioApplication {
             add("https://ts.yashenggd.com/20210530/EStaCgCR/1000kb/hls/w1GI2UZb.ts");
 
         }};
-        list.addAll(list);list.addAll(list);list.addAll(list);
+        list.addAll(list);list.addAll(list);list.addAll(list);list.addAll(list);
         SslService sslService = new SslServiceImpl();
         HttpService httpService = new HttpServiceImpl(sslService, threadPool);
         AtomicInteger a = new AtomicInteger(0);
