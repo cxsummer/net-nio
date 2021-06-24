@@ -167,10 +167,10 @@ public class HttpNioImpl extends NioAbstract {
             closeChannel(socketChannel);
         }
         int times = socketChannelPool.channelTimes(socketChannel);
-        socketChannelPool.close(socketChannel, c -> c.setSslEngine(null));
+        socketChannelPool.close(socketChannel, null);
         Assert.isTrue(times > 0, "服务器断开连接");
-        HttpResponseVO httpResponseVO = (HttpResponseVO) selectionKey.attachment();
-        HttpRequestVO httpRequestVO = httpResponseVO.getHttpRequestVO();
+        Object att = selectionKey.attachment();
+        HttpRequestVO httpRequestVO = att instanceof HttpResponseVO ? ((HttpResponseVO) att).getHttpRequestVO() : ((HttpRequestVO) att);
         httpRequestVO.setSslEngine(null);
         httpRequestVO.setByteBuffer(null);
         NioAddressVO address = new NioAddressVO();

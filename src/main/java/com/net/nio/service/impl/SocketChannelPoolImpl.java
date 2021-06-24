@@ -90,7 +90,7 @@ public class SocketChannelPoolImpl<T> implements SocketChannelPool<T> {
     public synchronized void close(SocketChannel socketChannel, Consumer<T> attConsumer) throws IOException {
         Channel channel = getChannelFromSocket(socketChannel);
         channel.setFree(1);
-        channel.setAttConsumer(attConsumer);
+        Optional.ofNullable(attConsumer).ifPresent(c -> channel.setAttConsumer(c));
         if (addressList.size() > 0) {
             NioAddressVO address = addressList.get(0);
             submit(address);
