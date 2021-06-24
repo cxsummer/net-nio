@@ -6,7 +6,12 @@ package com.net.nio.exception;
  * @description
  */
 public class AssertionException extends RuntimeException {
-    public AssertionException(String message){
+
+    public AssertionException(Throwable cause) {
+        super(cause);
+    }
+
+    public AssertionException(String message) {
         super(message);
     }
 }

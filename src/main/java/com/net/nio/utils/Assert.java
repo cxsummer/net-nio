@@ -16,6 +16,12 @@ public class Assert {
         }
     }
 
+    public static void isTrue(boolean test, Throwable e) {
+        if (!test) {
+            throw new AssertionException(e);
+        }
+    }
+
     public static void isIoTrue(boolean test, String message) throws IOException {
         if (!test) {
             throw new IOException(message);
