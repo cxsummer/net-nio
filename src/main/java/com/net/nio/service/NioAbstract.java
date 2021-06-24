@@ -37,7 +37,6 @@ public abstract class NioAbstract {
 
     protected Selector selector;
     private Thread nioMonitorThread;
-    private Method getExceptionHandler;
     protected ExecutorService threadPool;
 
     public NioAbstract(ExecutorService threadPool) {
@@ -45,8 +44,7 @@ public abstract class NioAbstract {
             this.threadPool = threadPool;
             this.selector = Selector.open();
             threadPool.submit(this::startNioMonitor);
-            getExceptionHandler = BaseNetVO.class.getMethod("getExceptionHandler");
-        } catch (IOException | NoSuchMethodException e) {
+        } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
@@ -71,7 +69,7 @@ public abstract class NioAbstract {
                 while (iterator.hasNext()) {
                     SelectionKey selectionKey = iterator.next();
                     iterator.remove();
-                    forEachHandler(this, selectionKey, (Consumer<Exception>) getExceptionHandler.invoke(selectionKey.attachment()), threadPool);
+                    forEachHandler(this, selectionKey, threadPool);
                 }
             } catch (Exception e) {
                 e.printStackTrace();
@@ -100,6 +98,13 @@ public abstract class NioAbstract {
     }
 
     /**
+     * 处理框架报错
+     */
+    protected void exceptionHandler(SelectionKey selectionKey, Throwable e) {
+        e.printStackTrace();
+    }
+
+    /**
      * 连接操作
      *
      * @param selectionKey
@@ -121,7 +126,7 @@ public abstract class NioAbstract {
      * @param selectionKey
      * @throws IOException
      */
-    protected abstract void readHandler(SelectionKey selectionKey) throws IOException;
+    protected abstract void readHandler(SelectionKey selectionKey) throws Exception;
 
 }
 
@@ -141,15 +146,14 @@ enum SelectionHandler {
     private Predicate<SelectionKey> predicate;
     private BiConsumerTe<NioAbstract, SelectionKey> biConsumerTe;
 
-    public static void forEachHandler(NioAbstract nioAbstract, SelectionKey selectionKey, Consumer<Exception> exceptionHandler, ExecutorService threadPool) {
+    public static void forEachHandler(NioAbstract nioAbstract, SelectionKey selectionKey, ExecutorService threadPool) {
         Arrays.stream(SelectionHandler.values()).filter(s -> s.getPredicate().test(selectionKey)).peek(s -> selectionKey.interestOps(0)).forEach(s -> threadPool.submit(() -> {
             try {
                 s.getBiConsumerTe().accept(nioAbstract, selectionKey);
-            } catch (IOException e) {
-                nioAbstract.closeChannel(selectionKey.channel());
-                exceptionHandler.accept(e);
+            } catch (CallBackException e) {
+                throw e;
             } catch (Exception e) {
-                exceptionHandler.accept(e);
+                nioAbstract.exceptionHandler(selectionKey, e);
             }
         }));
     }

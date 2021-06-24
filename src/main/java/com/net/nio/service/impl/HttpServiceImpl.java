@@ -32,16 +32,11 @@ public class HttpServiceImpl extends HttpNioImpl implements HttpService {
 
     @Override
     public void doGet(String uri, Consumer<HttpResponseVO> callBack, LinkedHashMap... headers) {
-        doGet(uri, callBack, Exception::printStackTrace, headers);
+        doRequest(uri, "GET", null, callBack, headers);
     }
 
     @Override
-    public void doGet(String uri, Consumer<HttpResponseVO> callBack, Consumer<Exception> exceptionHandler, LinkedHashMap... headers) {
-        doRequest(uri, "GET", null, callBack, exceptionHandler, headers);
-    }
-
-    @Override
-    public void doRequest(String uri, String method, byte[] body, Consumer<HttpResponseVO> callBack, Consumer<Exception> exceptionHandler, LinkedHashMap... headers) {
+    public void doRequest(String uri, String method, byte[] body, Consumer<HttpResponseVO> callBack, LinkedHashMap... headers) {
         try {
             Matcher matcher = httpPattern.matcher(uri);
             Assert.isTrue(matcher.matches(), "uri格式错误");
@@ -65,7 +60,6 @@ public class HttpServiceImpl extends HttpNioImpl implements HttpService {
             httpRequestVO.setProtocol(protocol);
             httpRequestVO.setCallBack(callBack);
             httpRequestVO.setPath(uri.substring(pathIndex));
-            httpRequestVO.setExceptionHandler(exceptionHandler);
             Optional.ofNullable(headers).filter(h -> h.length > 0).map(h -> h[0]).ifPresent(httpRequestVO::setHeaders);
 
             NioAddressVO address = new NioAddressVO();

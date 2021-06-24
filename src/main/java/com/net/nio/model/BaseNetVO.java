@@ -16,9 +16,4 @@ public class BaseNetVO {
      * 回调方法
      */
     private Consumer<HttpResponseVO> callBack;
-
-    /**
-     * 异常处理
-     */
-    private Consumer<Exception> exceptionHandler;
 }

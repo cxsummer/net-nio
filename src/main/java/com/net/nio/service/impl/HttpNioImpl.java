@@ -69,7 +69,6 @@ public class HttpNioImpl extends NioAbstract {
             httpResponseVO.setOriginHeader(new byte[1024]);
             httpResponseVO.setHttpRequestVO(httpRequestVO);
             httpResponseVO.setCallBack(httpRequestVO.getCallBack());
-            httpResponseVO.setExceptionHandler(httpRequestVO.getExceptionHandler());
             selectionKey.attach(httpResponseVO);
             selectionKey.interestOps(SelectionKey.OP_READ);
         }
@@ -84,7 +83,7 @@ public class HttpNioImpl extends NioAbstract {
      * 但SelectionKey的cancel()并不会关闭连接，只是Selector再也不会监控与它相关的事件
      */
     @Override
-    protected void readHandler(SelectionKey selectionKey) throws IOException {
+    protected void readHandler(SelectionKey selectionKey) throws Exception {
         int num;
         ByteBuffer packetBuffer;
         ByteBuffer appBuffer = null;
@@ -150,27 +149,39 @@ public class HttpNioImpl extends NioAbstract {
                 }
             }
             if (num < 0) {
-                int times = socketChannelPool.channelTimes(socketChannel);
+                Assert.isIoTrue(httpResponseVO.getHeaders() != null, "服务器断开连接：" + num);
                 socketChannelPool.close(socketChannel, c -> c.setSslEngine(sslEngine));
-                if (httpResponseVO.getHeaders() != null) {
-                    contentDecode(httpResponseVO);
-                    doCallBack(httpResponseVO);
-                } else {
-                    Assert.isTrue(times > 0, "服务器断开连接：" + num);
-                    HttpRequestVO httpRequestVO = httpResponseVO.getHttpRequestVO();
-                    httpRequestVO.setSslEngine(null);
-                    httpRequestVO.setByteBuffer(null);
-                    NioAddressVO address = new NioAddressVO();
-                    address.setAtt(httpRequestVO);
-                    address.setPort(httpRequestVO.getPort());
-                    address.setHost(httpRequestVO.getHost());
-                    socketChannelPool.submit(address);
-                }
+                contentDecode(httpResponseVO);
+                doCallBack(httpResponseVO);
                 return;
             }
             appBuffer.clear();
         }
         selectionKey.interestOps(SelectionKey.OP_READ);
+    }
+
+    @Override
+    protected void exceptionHandler(SelectionKey selectionKey, Throwable e) {
+        try {
+            SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
+            if (e instanceof IOException) {
+                closeChannel(socketChannel);
+            }
+            int times = socketChannelPool.channelTimes(socketChannel);
+            socketChannelPool.close(socketChannel, c -> c.setSslEngine(null));
+            Assert.isTrue(times > 0, "服务器断开连接");
+            HttpResponseVO httpResponseVO = (HttpResponseVO) selectionKey.attachment();
+            HttpRequestVO httpRequestVO = httpResponseVO.getHttpRequestVO();
+            httpRequestVO.setSslEngine(null);
+            httpRequestVO.setByteBuffer(null);
+            NioAddressVO address = new NioAddressVO();
+            address.setAtt(httpRequestVO);
+            address.setPort(httpRequestVO.getPort());
+            address.setHost(httpRequestVO.getHost());
+            socketChannelPool.submit(address);
+        } catch (IOException exception) {
+            exception.printStackTrace();
+        }
     }
 
     private void doCallBack(HttpResponseVO httpResponseVO) {
