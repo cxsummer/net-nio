@@ -3,6 +3,7 @@ package com.net.nio.service;
 import com.net.nio.model.HttpResponseVO;
 
 import java.util.LinkedHashMap;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 /**
@@ -19,7 +20,7 @@ public interface HttpService {
      * @param callBack 回调
      * @param headers  请求头
      */
-    void doGet(String uri, Consumer<HttpResponseVO> callBack, LinkedHashMap... headers);
+    void doGet(String uri, BiConsumer<HttpResponseVO, Exception> callBack, LinkedHashMap... headers);
 
     /**
      * http 请求
@@ -30,5 +31,5 @@ public interface HttpService {
      * @param callBack 回调
      * @param headers  请求头
      */
-    void doRequest(String uri, String method, byte[] body, Consumer<HttpResponseVO> callBack, LinkedHashMap... headers);
+    void doRequest(String uri, String method, byte[] body, BiConsumer<HttpResponseVO, Exception> callBack, LinkedHashMap... headers);
 }

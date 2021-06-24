@@ -161,32 +161,28 @@ public class HttpNioImpl extends NioAbstract {
     }
 
     @Override
-    protected void exceptionHandler(SelectionKey selectionKey, Throwable e) {
-        try {
-            SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
-            if (e instanceof IOException) {
-                closeChannel(socketChannel);
-            }
-            int times = socketChannelPool.channelTimes(socketChannel);
-            socketChannelPool.close(socketChannel, c -> c.setSslEngine(null));
-            Assert.isTrue(times > 0, "服务器断开连接");
-            HttpResponseVO httpResponseVO = (HttpResponseVO) selectionKey.attachment();
-            HttpRequestVO httpRequestVO = httpResponseVO.getHttpRequestVO();
-            httpRequestVO.setSslEngine(null);
-            httpRequestVO.setByteBuffer(null);
-            NioAddressVO address = new NioAddressVO();
-            address.setAtt(httpRequestVO);
-            address.setPort(httpRequestVO.getPort());
-            address.setHost(httpRequestVO.getHost());
-            socketChannelPool.submit(address);
-        } catch (IOException exception) {
-            exception.printStackTrace();
+    protected void exceptionHandler(SelectionKey selectionKey, Throwable e) throws IOException {
+        SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
+        if (e instanceof IOException) {
+            closeChannel(socketChannel);
         }
+        int times = socketChannelPool.channelTimes(socketChannel);
+        socketChannelPool.close(socketChannel, c -> c.setSslEngine(null));
+        Assert.isTrue(times > 0, "服务器断开连接");
+        HttpResponseVO httpResponseVO = (HttpResponseVO) selectionKey.attachment();
+        HttpRequestVO httpRequestVO = httpResponseVO.getHttpRequestVO();
+        httpRequestVO.setSslEngine(null);
+        httpRequestVO.setByteBuffer(null);
+        NioAddressVO address = new NioAddressVO();
+        address.setAtt(httpRequestVO);
+        address.setPort(httpRequestVO.getPort());
+        address.setHost(httpRequestVO.getHost());
+        socketChannelPool.submit(address);
     }
 
     private void doCallBack(HttpResponseVO httpResponseVO) {
         try {
-            httpResponseVO.getCallBack().accept(httpResponseVO);
+            httpResponseVO.getCallBack().accept(httpResponseVO, null);
         } catch (Exception e) {
             throw new CallBackException(e);
         }

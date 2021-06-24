@@ -2,6 +2,7 @@ package com.net.nio.model;
 
 import lombok.Data;
 
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 /**
@@ -15,5 +16,5 @@ public class BaseNetVO {
     /**
      * 回调方法
      */
-    private Consumer<HttpResponseVO> callBack;
+    private BiConsumer<HttpResponseVO, Exception> callBack;
 }

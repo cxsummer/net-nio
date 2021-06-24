@@ -100,7 +100,7 @@ public abstract class NioAbstract {
     /**
      * 处理框架报错
      */
-    protected void exceptionHandler(SelectionKey selectionKey, Throwable e) {
+    protected void exceptionHandler(SelectionKey selectionKey, Throwable e) throws IOException {
         e.printStackTrace();
     }
 
@@ -153,7 +153,11 @@ enum SelectionHandler {
             } catch (CallBackException e) {
                 throw e;
             } catch (Exception e) {
-                nioAbstract.exceptionHandler(selectionKey, e);
+                try {
+                    nioAbstract.exceptionHandler(selectionKey, e);
+                } catch (Exception ioException) {
+                    ((BaseNetVO) selectionKey.attachment()).getCallBack().accept(null, ioException);
+                }
             }
         }));
     }

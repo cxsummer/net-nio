@@ -12,6 +12,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -31,12 +32,12 @@ public class HttpServiceImpl extends HttpNioImpl implements HttpService {
     }
 
     @Override
-    public void doGet(String uri, Consumer<HttpResponseVO> callBack, LinkedHashMap... headers) {
+    public void doGet(String uri, BiConsumer<HttpResponseVO, Exception> callBack, LinkedHashMap... headers) {
         doRequest(uri, "GET", null, callBack, headers);
     }
 
     @Override
-    public void doRequest(String uri, String method, byte[] body, Consumer<HttpResponseVO> callBack, LinkedHashMap... headers) {
+    public void doRequest(String uri, String method, byte[] body, BiConsumer<HttpResponseVO, Exception> callBack, LinkedHashMap... headers) {
         try {
             Matcher matcher = httpPattern.matcher(uri);
             Assert.isTrue(matcher.matches(), "uri格式错误");
