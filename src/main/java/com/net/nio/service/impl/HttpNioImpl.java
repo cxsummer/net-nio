@@ -158,6 +158,8 @@ public class HttpNioImpl extends NioAbstract {
                 } else {
                     Assert.isTrue(times > 0, "服务器断开连接：" + num);
                     HttpRequestVO httpRequestVO = httpResponseVO.getHttpRequestVO();
+                    httpRequestVO.setSslEngine(null);
+                    httpRequestVO.setByteBuffer(null);
                     NioAddressVO address = new NioAddressVO();
                     address.setAtt(httpRequestVO);
                     address.setPort(httpRequestVO.getPort());
