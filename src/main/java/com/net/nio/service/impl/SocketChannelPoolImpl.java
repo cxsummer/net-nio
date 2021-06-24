@@ -63,7 +63,6 @@ public class SocketChannelPoolImpl<T> implements SocketChannelPool {
         }
         List<Channel> channelList = pool.get(key);
         int activeSize = pool.values().stream().filter(Objects::nonNull).mapToInt(List::size).sum();
-        System.out.println("活跃的数量" + activeSize);
         if (activeSize < poolSize || minChannel != null) {
             if (channelList == null) {
                 channelList = new ArrayList();
@@ -82,7 +81,6 @@ public class SocketChannelPoolImpl<T> implements SocketChannelPool {
             minChannel.setSocketChannel(socketChannel);
             minChannel.setAddTime(System.currentTimeMillis());
             socketChannel.register(selector, SelectionKey.OP_CONNECT, att);
-            System.out.println("创建连接");
         } else {
             addressList.add(address);
         }

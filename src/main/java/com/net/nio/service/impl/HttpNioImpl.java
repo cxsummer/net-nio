@@ -38,7 +38,7 @@ public class HttpNioImpl extends NioAbstract {
     public HttpNioImpl(SslService sslService, ExecutorService threadPool) {
         super(threadPool);
         this.sslService = sslService;
-        this.socketChannelPool = new SocketChannelPoolImpl(1, selector);
+        this.socketChannelPool = new SocketChannelPoolImpl(50, selector);
     }
 
     @Override
