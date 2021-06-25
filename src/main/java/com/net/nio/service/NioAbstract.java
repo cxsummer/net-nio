@@ -124,7 +124,7 @@ public abstract class NioAbstract {
      * 读操作
      *
      * @param selectionKey
-     * @throws IOException
+     * @throws Exception
      */
     protected abstract void readHandler(SelectionKey selectionKey) throws Exception;
 
