@@ -53,12 +53,14 @@ public class HttpNioImpl extends NioAbstract {
 
     @Override
     protected void writeHandler(SelectionKey selectionKey) throws IOException {
+        int len;
         SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
         HttpRequestVO httpRequestVO = (HttpRequestVO) selectionKey.attachment();
         ByteBuffer byteBuffer = requestByteBuffer(httpRequestVO, socketChannel);
-        while (socketChannel.write(byteBuffer) > 0) {
+        while ((len = socketChannel.write(byteBuffer)) > 0) {
             Thread.yield();
         }
+        Assert.isIoTrue(len == 0, "服务器断开连接：" + len);
         if (byteBuffer.hasRemaining()) {
             selectionKey.interestOps(SelectionKey.OP_WRITE);
         } else {
